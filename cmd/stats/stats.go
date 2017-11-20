@@ -6,9 +6,9 @@ import (
 	"os"
 	"runtime"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/devplayg/esm"
+	"github.com/devplayg/esm/stats"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -22,17 +22,19 @@ var (
 )
 
 func main() {
+
 	// Flags
 	fs = flag.NewFlagSet("", flag.ExitOnError)
 	var (
-		version = fs.Bool("v", false, "Version")
-		debug   = fs.Bool("d", false, "Debug")
-		cpu     = fs.Int("cpu", 1, "CPU Count")
+		version  = fs.Bool("v", false, "Version")
+		debug    = fs.Bool("d", false, "Debug")
+		cpu      = fs.Int("cpu", 1, "CPU Count")
+		interval = fs.Int64("i", 3000, "Interval(ms)")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
 
-	//
+	// Version
 	if *version {
 		fmt.Printf("%s %s\n", ProductName, ProductVersion)
 		return
@@ -50,20 +52,17 @@ func main() {
 
 	// Start
 	errChan := make(chan error)
-	//		esm.LogDrain
 	go esm.LogDrain(errChan)
 
+	if err := esm.InitDatabase("192.168.239.128", 3306, "root", "sniper123!@#", "aptxm"); err != nil {
+		log.Fatal(err)
+	}
+
 	// Start engine
-	//	engine, err := inputor.NewEngine(*dbUser, *dbPass, *homeDir, *interval)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	engine.Start(errChan)
-	//	log.Info("Started")
+	statist := stats.NewStatist(*interval)
+	statist.Start(errChan)
 
-	//	waitForSignals()
 	esm.WaitForSignals()
-
 }
 
 func printHelp() {

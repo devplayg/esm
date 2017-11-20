@@ -6,6 +6,10 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"fmt"
+
+	"github.com/devplayg/golibs/orm"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,9 +32,16 @@ func InitLogger(level log.Level, keyword string) {
 	if err == nil {
 		log.SetOutput(file)
 	} else {
-		log.Error("Failed to log to file, using default stderr")
+		//		log.Error("Failed to log to file, using default stderr")
 		log.SetOutput(os.Stdout)
 	}
+}
+
+func InitDatabase(host string, port uint16, user, password, database string) error {
+	connStr := fmt.Sprintf(`%s:%s@tcp(%s:%d)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s`, user, password, host, port, database, "Asia%2FSeoul")
+	log.Debugf("Database connection string: %s", connStr)
+	err := orm.RegisterDataBase("default", "mysql", connStr, 3, 3)
+	return err
 }
 
 func LogDrain(errChan <-chan error) {
