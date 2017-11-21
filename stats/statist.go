@@ -69,6 +69,7 @@ func (e *Statist) Start(errChan chan<- error) error {
 }
 
 func (e *Statist) generateStats() error {
+	t1 := time.Now()
 	query := `
 		select 	t.rdate,
 				(sensor_code + 100000) sensor_code,
@@ -103,11 +104,13 @@ func (e *Statist) generateStats() error {
 		return err
 	}
 
+	t2 := time.Now()
 	for _, r := range rows {
 		e.addToStats(r, "srcip", r.SrcIp)
 		e.addToStats(r, "dstip", r.DstIp)
 		e.addToStats(r, "md5", r.Md5)
 	}
+	t3 := time.Now()
 
 	// Rank
 	for id, m1 := range e.statsMap {
@@ -115,6 +118,8 @@ func (e *Statist) generateStats() error {
 			e.statsRank[id][category] = rankByCount(m1[category], e.top)
 		}
 	}
+	t4 := time.Now()
+	log.Infof("Query=%3.1f, Statistics=%3.1f, Ranking=%3.1f", t2.Sub(t1).Seconds(), t3.Sub(t2).Seconds(), t4.Sub(t3).Seconds())
 
 	return nil
 }
