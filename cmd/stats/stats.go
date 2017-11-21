@@ -59,7 +59,7 @@ func main() {
 	errChan := make(chan error)
 	go esm.LogDrain(errChan)
 
-	if err := esm.InitDatabase("192.168.239.128", 3306, "root", "sniper123!@#", "aptxm"); err != nil {
+	if err := esm.InitDatabase("127.0.0.1", 3306, "root", "sniper123!@#", "aptxm"); err != nil {
 		log.Fatal(err)
 	}
 
