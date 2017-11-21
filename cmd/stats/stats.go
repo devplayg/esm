@@ -1,20 +1,25 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 
 	"github.com/devplayg/esm"
 	"github.com/devplayg/esm/stats"
+	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	ProductName    = "SNIPER APTX-T Statistics Manager"
-	ProductKeyword = "esmstats"
-	ProductVersion = "2.0"
+	ProductName       = "SNIPER APTX-T Statistics Manager"
+	ProductKeyword    = "esmstats"
+	ProductVersion    = "2.0"
+	DefaultServerAddr = "127.0.0.1:8080"
 )
 
 var (
@@ -29,7 +34,7 @@ func main() {
 		version  = fs.Bool("v", false, "Version")
 		debug    = fs.Bool("d", false, "Debug")
 		cpu      = fs.Int("cpu", 1, "CPU Count")
-		interval = fs.Int64("i", 3000, "Interval(ms)")
+		interval = fs.Int64("i", 10000, "Interval(ms)")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
@@ -62,12 +67,31 @@ func main() {
 	statist := stats.NewStatist(*interval)
 	statist.Start(errChan)
 
+	// Start http server
+	r := mux.NewRouter()
+	r.HandleFunc("/rank/{groupid:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
+	log.Fatal(http.ListenAndServe(DefaultServerAddr, r))
+
+	// Wait
 	esm.WaitForSignals()
 }
 
 func printHelp() {
 	fmt.Println("inputor")
 	fs.PrintDefaults()
+}
+
+func rankHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	//	str := fmt.Sprintf("%s - %s", vars["category"], vars["top"])
+
+	groupId, _ := strconv.Atoi(vars["groupid"])
+	top, _ := strconv.Atoi(vars["top"])
+
+	list := stats.GetRank(groupId, vars["category"], top)
+	buf, _ := json.Marshal(list)
+	w.Write(buf)
+	//	fmt.Fprintf(w, buf)
 }
 
 //SpecialBuild

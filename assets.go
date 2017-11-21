@@ -12,8 +12,8 @@ type Sensor struct {
 }
 
 type MemberAsset struct {
-	MemberId int16
-	AssetId  int16
+	MemberId int
+	AssetId  int
 }
 
 func getSensors() ([]Sensor, error) {
@@ -25,13 +25,13 @@ func getSensors() ([]Sensor, error) {
 
 type Md5Hash struct {
 	Md5      string
-	Score    uint8
-	Judge    uint8
-	Filetype uint8
-	Category uint8
-	Ext1     uint8
-	Ext2     uint8
-	Ext3     uint8
+	Score    int
+	Judge    int
+	Filetype int
+	Category int
+	Ext1     int
+	Ext2     int
+	Ext3     int
 	Filesize uint64
 	Rdate    time.Time
 	Udate    time.Time
@@ -39,14 +39,14 @@ type Md5Hash struct {
 
 type DownloadLog struct {
 	Rdate          time.Time
-	SensorCode     uint16
-	IppoolSrcGcode uint16
-	IppoolSrcOcode uint16
-	TransType      uint8
+	SensorCode     int
+	IppoolSrcGcode int
+	IppoolSrcOcode int
+	TransType      int
 	SrcIp          uint32
-	SrcPort        uint16
-	DstIp          uint64
-	DstPort        uint16
+	SrcPort        int
+	DstIp          uint32
+	DstPort        int
 	DstCountry     string
 	Domain         string
 	Url            string
@@ -80,7 +80,7 @@ type DownloadLog struct {
 
 type Item struct {
 	Key   interface{}
-	Count uint32
+	Count int64
 }
 
 type ItemList []Item

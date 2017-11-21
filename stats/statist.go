@@ -1,14 +1,17 @@
 package stats
 
 import (
-	//	"sort"
+	"sort"
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/devplayg/esm"
 	"github.com/devplayg/golibs/orm"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	ALL = -1
 )
 
 var (
@@ -17,13 +20,15 @@ var (
 	t         time.Time
 )
 
-type StatsMap map[int32]map[string]map[interface{}]uint32
-type StatsRank map[int32]map[string]esm.ItemList
+type StatsMap map[int]map[string]map[interface{}]int64
+type StatsRank map[int]map[string]esm.ItemList
 
 type Statist struct {
-	interval     int64
-	statsMap     StatsMap
-	memberAssets map[int16]map[int16]bool
+	interval       int64
+	statsMap       StatsMap
+	statsRank      StatsRank
+	membersByAsset map[int][]int
+	top            int
 }
 
 func NewStatist(interval int64) *Statist {
@@ -31,6 +36,7 @@ func NewStatist(interval int64) *Statist {
 
 	return &Statist{
 		interval: interval,
+		top:      10,
 	}
 }
 
@@ -39,17 +45,19 @@ func (e *Statist) Start(errChan chan<- error) error {
 		for {
 			t = time.Now()
 
-			//						if err := updateMd5Map(); err != nil {
-			//				errChan <- nil
-			//			}
-
 			e.statsMap = make(StatsMap)
-			e.updateMembersAssets()
+			e.statsRank = make(StatsRank)
+			if err := e.updateMembersAssets(); err != nil {
+				errChan <- err
+			}
 			if err := e.generateStats(); err != nil {
 				errChan <- err
 			}
-			//			genStats("download")
-			//			genStats("detection")
+
+			rwMutex := new(sync.RWMutex)
+			rwMutex.Lock()
+			statsRank = e.statsRank
+			rwMutex.Unlock()
 
 			// Sleep
 			log.Debugf("Sleep %3.1fs", (time.Duration(e.interval) * time.Millisecond).Seconds())
@@ -88,199 +96,134 @@ func (e *Statist) generateStats() error {
 	sdate := t.Format("2006-01-02") + " 00:00:00"
 	edate := t.Format("2006-01-02") + " 23:59:59"
 
-	//	var rows []esm.DownloadLog
+	var rows []esm.DownloadLog
 	o := orm.NewOrm()
-	//	_, err := o.Raw(query, sdate, edate).QueryRows(&rows)
-	//	if err != nil {
-	//		return err
-	//	}
-
-	//	//	statsIp := make(map[interface{}]uint32)
-	//	//	statsMd5 := make(map[interface{}]uint32)
-	//	for _, r := range rows {
-	//		e.addToStats(r, "src_ip")
-	//		//		statsIp[r.SrcIp] += 1
-	//		//		statsMd5[r.Md5] += 1
-	//	}
-
-	var rows []orm.Params
-	_, err := o.Raw(query, sdate, edate).Values(&rows)
+	_, err := o.Raw(query, sdate, edate).QueryRows(&rows)
 	if err != nil {
 		return err
 	}
 
 	for _, r := range rows {
-		spew.Dump(r)
-		//		e.addToStats(r, "src_ip")
-
+		e.addToStats(r, "srcip", r.SrcIp)
+		e.addToStats(r, "dstip", r.DstIp)
+		e.addToStats(r, "md5", r.Md5)
 	}
 
-	//	if err == nil && num > 0 {
-	//		fmt.Println(maps[0]["user_name"]) // slene
-	//	}
+	// Rank
+	for id, m1 := range e.statsMap {
+		for category, _ := range m1 {
+			e.statsRank[id][category] = rankByCount(m1[category], e.top)
+		}
+	}
 
 	return nil
 }
 
-func (e *Statist) addToStats(r esm.DownloadLog, category string) error {
+func (e *Statist) addToStats(r esm.DownloadLog, category string, val interface{}) error {
+
+	// By sensor
 	if r.SensorCode > 0 {
-		//		if _, ok := e.statsMap[r.SensorCode]; !ok {
-		//			e.statsMap[(int)r.SensorCode] := nil
-		//												e.statsMap[r.SensorCode] := map[string]interface{}
-		//		}
+		if _, ok := e.statsMap[r.SensorCode]; !ok {
+			e.statsMap[r.SensorCode] = make(map[string]map[interface{}]int64)
+			e.statsRank[r.SensorCode] = make(map[string]esm.ItemList)
+		}
+		if _, ok := e.statsMap[r.SensorCode][category]; !ok {
+			e.statsMap[r.SensorCode][category] = make(map[interface{}]int64)
+			e.statsRank[r.SensorCode][category] = nil
+		}
+		e.statsMap[r.SensorCode][category][val] += 1
+	}
+
+	// By group
+	if r.IppoolSrcGcode > 0 {
+		if _, ok := e.statsMap[r.IppoolSrcGcode]; !ok {
+			e.statsMap[r.IppoolSrcGcode] = make(map[string]map[interface{}]int64)
+			e.statsRank[r.IppoolSrcGcode] = make(map[string]esm.ItemList)
+		}
+		if _, ok := e.statsMap[r.IppoolSrcGcode][category]; !ok {
+			e.statsMap[r.IppoolSrcGcode][category] = make(map[interface{}]int64)
+			e.statsRank[r.IppoolSrcGcode][category] = nil
+		}
+		e.statsMap[r.IppoolSrcGcode][category][val] += 1
+	}
+
+	// To all
+	if _, ok := e.statsMap[ALL]; !ok {
+		e.statsMap[ALL] = make(map[string]map[interface{}]int64)
+		e.statsRank[ALL] = make(map[string]esm.ItemList)
+	}
+	if _, ok := e.statsMap[ALL][category]; !ok {
+		e.statsMap[ALL][category] = make(map[interface{}]int64)
+		e.statsRank[ALL][category] = nil
+	}
+	e.statsMap[ALL][category][val] += 1
+
+	// By member
+	if arr, ok := e.membersByAsset[r.IppoolSrcGcode]; ok {
+		for _, memberId := range arr {
+			id := memberId * -1
+
+			if _, ok := e.statsMap[id]; !ok {
+				e.statsMap[id] = make(map[string]map[interface{}]int64)
+				e.statsRank[id] = make(map[string]esm.ItemList)
+			}
+			if _, ok := e.statsMap[id][category]; !ok {
+				e.statsMap[id][category] = make(map[interface{}]int64)
+				e.statsRank[id][category] = nil
+			}
+			e.statsMap[id][category][val] += 1
+		}
 	}
 
 	return nil
 }
 
 func (e *Statist) updateMembersAssets() error {
-	query := "select member_id, asset_id from mbr_asset where asset_type = 2"
-	m := make(map[int16]map[int16]bool)
-	var rows []esm.MemberAsset
+	query := "select asset_id, member_id from mbr_asset where asset_type = 2"
+	m := make(map[int][]int)
+
+	//	m := make(map[int]map[int]bool)
 	o := orm.NewOrm()
+	var rows []esm.MemberAsset
 	_, err := o.Raw(query).QueryRows(&rows)
 	if err != nil {
 		return err
 	}
-
 	for _, r := range rows {
-		if _, ok := m[r.MemberId]; !ok {
-			m[r.MemberId] = make(map[int16]bool)
+		if _, ok := m[r.AssetId]; !ok {
+			m[r.AssetId] = make([]int, 0)
 		}
-		m[r.MemberId][r.AssetId] = true
+		m[r.AssetId] = append(m[r.AssetId], r.MemberId)
 	}
-	var rwMutex = new(sync.RWMutex)
+
+	rwMutex := new(sync.RWMutex)
 	rwMutex.Lock()
-	e.memberAssets = m
+	e.membersByAsset = m
 	rwMutex.Unlock()
 	return nil
+
 }
 
-//func updateMd5Map() error {
-//	query := `
-//		select  md5,
-//		        score,
-//		        filetype,
-//		        category,
-//		        ext1,
-//		        ext2,
-//		        ext3,
-//		        filesize,
-//		        rdate,
-//		        udate ,
-//				case
-//					when score = 100 then 1
-//					when score < 100 and score >= 40 then 2
-//					else 3
-//				end judge
-//		from pol_file_md5
-//	`
-//	var rows []esm.Md5Hash
-//	o := orm.NewOrm()
-//	_, err := o.Raw(query).QueryRows(&rows)
-//	if err != nil {
-//		return err
-//	}
+func rankByCount(m map[interface{}]int64, top int) esm.ItemList {
+	list := make(esm.ItemList, len(m))
+	i := 0
+	for k, v := range m {
+		list[i] = esm.Item{k, v}
+		i++
+	}
+	sort.Sort(sort.Reverse(list))
+	if top > 0 && len(list) > top {
+		return list[0:top]
+	} else {
+		return list
+	}
+}
 
-//	for _, r := range rows {
-//		md5Map.LoadOrStore(r.Md5, r)
-//	}
-//	return nil
-//}
-
-//func genStats(key string) error {
-//	query := `
-//			select 	rdate,
-//					(sensor_code + 100000) sensor_code,
-//					trans_type,
-//					ippool_src_gcode,
-//					ippool_src_ocode,
-//					session_id,
-//					src_ip,
-//					src_port,
-//					src_country,
-//					dst_ip,
-//					dst_port,
-//					dst_country,
-//					domain,
-//					url,
-//					filesize,
-//					filename,
-//					md5,
-//					mail_sender,
-//					mail_recipient
-//			from log_event_filetrans
-//			where rdate >= ? and rdate <= ?
-//		`
-//	sdate := t.Format("2006-01-02") + " 00:00:00"
-//	edate := t.Format("2006-01-02") + " 23:59:59"
-
-//	var rows []esm.DownloadLog
-//	o := orm.NewOrm()
-//	_, err := o.Raw(query, sdate, edate).QueryRows(&rows)
-//	if err != nil {
-//		return err
-//	}
-
-//	//	stats := make(map[string]ItemList)
-//	//	statsIp := make(map[interface{}]uint32)
-//	//	statsMd5 := make(map[interface{}]uint32)
-//	//	members := map[int]map[int]bool{
-//	//		3: {
-//	//			1: true,
-//	//			2: true,
-//	//		},
-//	//	}
-//	//	spew.Dump(members)
-
-//	for _, r := range rows {
-//		spew.Dump(r)
-//		//		statsIp[r.SrcIp] += 1
-//		//		statsMd5[r.Md5] += 1
-//	}
-//	// -1 / "srcip", ip, count
-
-//	stats := make(StatsMap)
-//	//	rankByCount(statsIp, 5)
-//	//	rankByCount(statsMd5, 5)
-//	spew.Dump(stats)
-
-//	return nil
-//}
-
-//func rankByCount(m map[interface{}]uint32, top uint8) esm.ItemList {
-//	list := make(esm.ItemList, len(m))
-//	i := 0
-//	for k, v := range m {
-//		list[i] = esm.Item{k, v}
-//		i++
-//	}
-//	sort.Sort(sort.Reverse(list))
-//	if top > 0 {
-//		return list[0:top]
-//	} else {
-//		return list
-//	}
-//}
-
-//func rankByWordCount(wordFrequencies map[string]int) PairList{
-//  pl := make(PairList, len(wordFrequencies))
-//  i := 0
-//  for k, v := range wordFrequencies {
-//    pl[i] = Pair{k, v}
-//    i++
-//  }
-//  sort.Sort(sort.Reverse(pl))
-//  return pl
-//}
-
-//type Pair struct {
-//  Key string
-//  Value int
-//}
-
-//type PairList []Pair
-
-//func (p PairList) Len() int { return len(p) }
-//func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
-//func (p PairList) Swap(i, j int){ p[i], p[j] = p[j], p[i] }
+func GetRank(groupId int, category string, top int) esm.ItemList {
+	if _, ok := statsRank[groupId]; ok {
+		if list, ok2 := statsRank[groupId][category]; ok2 {
+			return list
+		}
+	}
+	return nil
+}

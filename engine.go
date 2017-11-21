@@ -63,3 +63,18 @@ func WaitForSignals() {
 		log.Println("Signal received, shutting down...")
 	}
 }
+
+//func rankByCount(m map[interface{}]uint32, top uint8) esm.ItemList {
+//	list := make(esm.ItemList, len(m))
+//	i := 0
+//	for k, v := range m {
+//		list[i] = esm.Item{k, v}
+//		i++
+//	}
+//	sort.Sort(sort.Reverse(list))
+//	if top > 0 {
+//		return list[0:top]
+//	} else {
+//		return list
+//	}
+//}
