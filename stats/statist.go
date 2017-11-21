@@ -17,7 +17,6 @@ const (
 var (
 	md5Map    sync.Map
 	statsRank StatsRank
-	t         time.Time
 )
 
 type StatsMap map[int]map[string]map[interface{}]int64
@@ -43,8 +42,6 @@ func NewStatist(interval int64) *Statist {
 func (e *Statist) Start(errChan chan<- error) error {
 	go func() {
 		for {
-			t = time.Now()
-
 			e.statsMap = make(StatsMap)
 			e.statsRank = make(StatsRank)
 			if err := e.updateMembersAssets(); err != nil {
@@ -94,8 +91,8 @@ func (e *Statist) generateStats() error {
 		from log_event_filetrans t left outer join pol_file_md5 t1 on t1.md5 = t.md5
 		where t.rdate >= ? and t.rdate <= ?
 	`
-	sdate := t.Format("2006-01-02") + " 00:00:00"
-	edate := t.Format("2006-01-02") + " 23:59:59"
+	sdate := t1.Format("2006-01-02") + " 00:00:00"
+	edate := t1.Format("2006-01-02") + " 23:59:59"
 
 	var rows []esm.DownloadLog
 	o := orm.NewOrm()

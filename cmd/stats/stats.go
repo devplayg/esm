@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strconv"
@@ -19,7 +20,7 @@ const (
 	ProductName       = "SNIPER APTX-T Statistics Manager"
 	ProductKeyword    = "esmstats"
 	ProductVersion    = "2.0"
-	DefaultServerAddr = "127.0.0.1:8080"
+	DefaultServerAddr = ":8080"
 )
 
 var (
@@ -70,6 +71,8 @@ func main() {
 	// Start http server
 	r := mux.NewRouter()
 	r.HandleFunc("/rank/{groupid:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
+	r.PathPrefix("/debug").Handler(http.DefaultServeMux)
+
 	log.Fatal(http.ListenAndServe(DefaultServerAddr, r))
 
 	// Wait
@@ -83,7 +86,6 @@ func printHelp() {
 
 func rankHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	//	str := fmt.Sprintf("%s - %s", vars["category"], vars["top"])
 
 	groupId, _ := strconv.Atoi(vars["groupid"])
 	top, _ := strconv.Atoi(vars["top"])
@@ -91,7 +93,6 @@ func rankHandler(w http.ResponseWriter, r *http.Request) {
 	list := stats.GetRank(groupId, vars["category"], top)
 	buf, _ := json.Marshal(list)
 	w.Write(buf)
-	//	fmt.Fprintf(w, buf)
 }
 
 //SpecialBuild
