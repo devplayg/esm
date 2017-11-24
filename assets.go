@@ -1,10 +1,18 @@
-package esm
+package siem
 
 import (
 	"time"
 
 	"github.com/devplayg/golibs/orm"
 )
+
+type DbInfo struct {
+	DriverName string
+	Host       string
+	Port       string
+	Username   string
+	Password   string
+}
 
 type Sensor struct {
 	Ip   string

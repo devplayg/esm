@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devplayg/esm"
 	"github.com/devplayg/golibs/orm"
+	"github.com/devplayg/siem"
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +32,7 @@ func (e *Inputor) Start(errChan chan<- error) error {
 			o := orm.NewOrm()
 
 			// Read sensors
-			sensors, err := esm.GetSensors()
+			sensors, err := siem.GetSensors()
 			if err != nil {
 				errChan <- err
 				continue

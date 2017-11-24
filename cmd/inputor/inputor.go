@@ -1,17 +1,15 @@
 package main
 
 import (
-	//	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
-	//	"strconv"
 
-	"github.com/devplayg/esm"
-	"github.com/devplayg/esm/inputor"
+	"github.com/devplayg/siem"
+	"github.com/devplayg/siem/inputor"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -37,6 +35,7 @@ func main() {
 		cpu      = fs.Int("cpu", 1, "CPU Count")
 		interval = fs.Int64("i", 10000, "Interval(ms)")
 		watchDir = fs.String("dir", "/home/sniper_bps/relation/", "Directory to watch")
+		db       = fs.Bool("db", false, "Set database")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
@@ -47,23 +46,34 @@ func main() {
 		return
 	}
 
+	// DB setting
+	if *db {
+		err := siem.SetDatabase()
+		if err != nil {
+			log.Println(err.Error())
+		}
+
+		return
+	}
+
 	// Debug
 	if *debug {
-		esm.InitLogger(log.DebugLevel, ProductKeyword)
+		siem.InitLogger(log.DebugLevel, ProductKeyword)
 	} else {
-		esm.InitLogger(log.InfoLevel, ProductKeyword)
+		siem.InitLogger(log.InfoLevel, ProductKeyword)
 	}
 
 	// CPU
 	runtime.GOMAXPROCS(*cpu)
 
-	// Start
-	errChan := make(chan error)
-	go esm.LogDrain(errChan)
-
-	if err := esm.InitDatabase("127.0.0.1", 3306, "root", "sniper123!@#", "aptxm"); err != nil {
+	// Initialize database
+	if err := siem.InitDatabase("127.0.0.1", 3306, "root", "sniper123!@#", "aptxm"); err != nil {
 		log.Fatal(err)
 	}
+
+	// Logging
+	errChan := make(chan error)
+	go siem.LogDrain(errChan)
 
 	// Start engine
 	inputor := inputor.NewInputor(*interval, *watchDir)
@@ -77,7 +87,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(DefaultServerAddr, r))
 
 	// Wait
-	esm.WaitForSignals()
+	siem.WaitForSignals()
 }
 
 func printHelp() {

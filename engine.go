@@ -1,17 +1,21 @@
-package esm
+package siem
 
 import (
+	"bufio"
+	"encoding/gob"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
-	"fmt"
-
+	"github.com/devplayg/golibs/crypto"
 	"github.com/devplayg/golibs/orm"
-
 	log "github.com/sirupsen/logrus"
 )
+
+var enckey = []byte("DEVPLAYG_ENCKEY_")
 
 func InitLogger(level log.Level, keyword string) {
 	// Set log format
@@ -64,17 +68,57 @@ func WaitForSignals() {
 	}
 }
 
-//func rankByCount(m map[interface{}]uint32, top uint8) esm.ItemList {
-//	list := make(esm.ItemList, len(m))
-//	i := 0
-//	for k, v := range m {
-//		list[i] = esm.Item{k, v}
-//		i++
-//	}
-//	sort.Sort(sort.Reverse(list))
-//	if top > 0 {
-//		return list[0:top]
-//	} else {
-//		return list
-//	}
-//}
+func SaveObject(path string, object interface{}) error {
+	file, err := os.Create(path)
+	if err == nil {
+		encoder := gob.NewEncoder(file)
+		encoder.Encode(object)
+	}
+	file.Close()
+	return err
+}
+
+func LoadObject(path string, object interface{}) error {
+	file, err := os.Open(path)
+	if err == nil {
+		decoder := gob.NewDecoder(file)
+		err = decoder.Decode(object)
+	}
+	file.Close()
+	return err
+}
+
+func SetDatabase() error {
+	dbInfo := DbInfo{
+		DriverName: "mysql",
+	}
+
+	fmt.Println("Setting database")
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("Hostname : ")
+	hostname, _ := reader.ReadString('\n')
+	dbInfo.Host = strings.TrimSpace(hostname)
+	fmt.Printf("Port     : ")
+	port, _ := reader.ReadString('\n')
+	dbInfo.Port = strings.TrimSpace(port)
+	fmt.Printf("Username : ")
+	username, _ := reader.ReadString('\n')
+	dbInfo.Username = strings.TrimSpace(username)
+	fmt.Printf("Password : ")
+	password, _ := reader.ReadString('\n')
+	dbInfo.Password = strings.TrimSpace(password)
+
+	// Crypto
+
+	ex, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	filenameWithoutExt := strings.TrimSuffix(filepath.Base(ex), filepath.Ext(ex))
+	fp := filepath.Join(filepath.Dir(ex), filenameWithoutExt+".enc")
+	err = crypto.SaveObjectToEncryptedFile(fp, enckey, dbInfo)
+	if err != nil {
+		return err
+	}
+	return nil
+}

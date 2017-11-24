@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/devplayg/esm"
-	"github.com/devplayg/esm/stats"
+	"github.com/devplayg/siem"
+	"github.com/devplayg/siem/stats"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -60,6 +60,7 @@ func main() {
 	errChan := make(chan error)
 	go esm.LogDrain(errChan)
 
+	// Initialize database
 	if err := esm.InitDatabase("127.0.0.1", 3306, "root", "sniper123!@#", "aptxm"); err != nil {
 		log.Fatal(err)
 	}
