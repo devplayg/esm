@@ -16,7 +16,7 @@ type MemberAsset struct {
 	AssetId  int
 }
 
-func getSensors() ([]Sensor, error) {
+func GetSensors() ([]Sensor, error) {
 	var sensors []Sensor
 	o := orm.NewOrm()
 	_, err := o.Raw("select ip, port from ast_sensor").QueryRows(&sensors)

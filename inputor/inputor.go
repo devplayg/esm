@@ -1,4 +1,4 @@
-package esm
+package inputor
 
 import (
 	"fmt"
@@ -7,32 +7,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devplayg/esm"
 	"github.com/devplayg/golibs/orm"
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 )
-
-//func init() {
-//	initDatabase("root:sniper123!@#@tcp(127.0.0.1:3306)/aptxm?allowAllFiles=true&charset=utf8&parseTime=true&loc=Asia%2FSeoul")
-//}
-
-//func initDatabase(dbUser, dbPass, connStr string) {
-//	orm.RegisterDataBase("default", "mysql", connStr, 3, 3)
-//}
 
 type Inputor struct {
 	dir      string
 	interval int64
 }
 
-func NewInputor(dbUser, dbPass string, dir string, interval int64) (*Inputor, error) {
-	connStr := fmt.Sprintf(`%s:%s@tcp(127.0.0.1:3306)/aptxm?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s`, dbUser, dbPass, "Asia%2FSeoul")
-	log.Debugf("Database connection string: %s", connStr)
-	err := orm.RegisterDataBase("default", "mysql", connStr, 3, 3)
+func NewInputor(interval int64, dir string) *Inputor {
 	return &Inputor{
 		dir:      dir,
 		interval: interval,
-	}, err
+	}
 }
 
 func (e *Inputor) Start(errChan chan<- error) error {
@@ -42,7 +32,7 @@ func (e *Inputor) Start(errChan chan<- error) error {
 			o := orm.NewOrm()
 
 			// Read sensors
-			sensors, err := getSensors()
+			sensors, err := esm.GetSensors()
 			if err != nil {
 				errChan <- err
 				continue

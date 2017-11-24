@@ -1,26 +1,26 @@
 package main
 
 import (
-	"encoding/json"
+	//	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
-	"strconv"
+	//	"strconv"
 
 	"github.com/devplayg/esm"
-	"github.com/devplayg/esm/stats"
+	"github.com/devplayg/esm/inputor"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	ProductName       = "SNIPER APTX-T Statistics Manager"
-	ProductKeyword    = "esmstats"
+	ProductName       = "SNIPER APTX-T Data Inputor"
+	ProductKeyword    = "inputor"
 	ProductVersion    = "2.0"
-	DefaultServerAddr = ":8080"
+	DefaultServerAddr = "127.0.0.1:8080"
 )
 
 var (
@@ -33,9 +33,10 @@ func main() {
 	fs = flag.NewFlagSet("", flag.ExitOnError)
 	var (
 		version  = fs.Bool("v", false, "Version")
-		debug    = fs.Bool("d", false, "Debug")
+		debug    = fs.Bool("debug", false, "Debug")
 		cpu      = fs.Int("cpu", 1, "CPU Count")
 		interval = fs.Int64("i", 10000, "Interval(ms)")
+		watchDir = fs.String("dir", "/home/sniper_bps/relation/", "Directory to watch")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
@@ -65,12 +66,12 @@ func main() {
 	}
 
 	// Start engine
-	statist := stats.NewStatist(*interval)
-	statist.Start(errChan)
+	inputor := inputor.NewInputor(*interval, *watchDir)
+	inputor.Start(errChan)
 
 	// Start http server
 	r := mux.NewRouter()
-	r.HandleFunc("/rank/{groupid:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
+	//	r.HandleFunc("/rank/{groupid:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
 	r.PathPrefix("/debug").Handler(http.DefaultServeMux)
 
 	log.Fatal(http.ListenAndServe(DefaultServerAddr, r))
@@ -83,42 +84,3 @@ func printHelp() {
 	fmt.Println(ProductKeyword)
 	fs.PrintDefaults()
 }
-
-func rankHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	groupId, _ := strconv.Atoi(vars["groupid"])
-	top, _ := strconv.Atoi(vars["top"])
-
-	list := stats.GetRank(groupId, vars["category"], top)
-	buf, _ := json.Marshal(list)
-	w.Write(buf)
-}
-
-//SpecialBuild
-//ProductVersion
-//ProductPrivatePart
-//ProductName
-//ProductMinorPart
-//ProductMajorPart
-//ProductBuildPart
-//PrivateBuild
-//OriginalFilename
-//LegalTrademarks
-//LegalCopyright
-//IsSpecialBuild
-//IsPreRelease
-//IsPrivateBuild
-//IsPatched
-//IsDebug
-//InternalName
-//FileVersion
-//FilePrivatePart
-//FileName
-//FileMinorPart
-//FileMajorPart
-//FileDescription
-//FileBuildPart
-//CompanyName
-//Comments
-//FileVersionInfo Class
