@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	//"github.com/davecgh/go-spew/spew"
 
 	"github.com/devplayg/golibs/crypto"
 	"github.com/devplayg/golibs/orm"
@@ -27,7 +28,7 @@ func InitLogger(level log.Level, keyword string) {
 	// Set log level
 	log.SetLevel(level)
 	if log.GetLevel() != log.InfoLevel {
-		log.Infof("logginglevel=%s", log.GetLevel())
+		log.Infof("Logging level=%s", log.GetLevel())
 	}
 
 	// Set log file
@@ -41,10 +42,25 @@ func InitLogger(level log.Level, keyword string) {
 	}
 }
 
-func InitDatabase(host string, port uint16, user, password, database string) error {
-	connStr := fmt.Sprintf(`%s:%s@tcp(%s:%d)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s`, user, password, host, port, database, "Asia%2FSeoul")
+func InitDatabase(keyword string) error {
+	ex, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	configPath := filepath.Join(filepath.Dir(ex), keyword+".enc")
+	config, err := GetConfig(configPath)
+	if err != nil {
+		return err
+	}
+	connStr := fmt.Sprintf(`%s:%s@tcp(%s:%s)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s`,
+		config["db.username"],
+		config["db.password"],
+		config["db.hostname"],
+		config["db.port"],
+		config["db.database"],
+		"Asia%2FSeoul")
 	log.Debugf("Database connection string: %s", connStr)
-	err := orm.RegisterDataBase("default", "mysql", connStr, 3, 3)
+	err = orm.RegisterDataBase("default", "mysql", connStr, 3, 3)
 	return err
 }
 
@@ -88,37 +104,46 @@ func LoadObject(path string, object interface{}) error {
 	return err
 }
 
-func SetDatabase() error {
-	dbInfo := DbInfo{
-		DriverName: "mysql",
+func GetConfig(configPath string) (map[string]string, error) {
+	config := make(map[string]string)
+
+	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+		err2 := crypto.LoadEncryptedObjectFile(configPath, enckey, &config)
+		return config, err2
 	}
+	return config, nil
+}
 
-	fmt.Println("Setting database")
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("Hostname : ")
-	hostname, _ := reader.ReadString('\n')
-	dbInfo.Host = strings.TrimSpace(hostname)
-	fmt.Printf("Port     : ")
-	port, _ := reader.ReadString('\n')
-	dbInfo.Port = strings.TrimSpace(port)
-	fmt.Printf("Username : ")
-	username, _ := reader.ReadString('\n')
-	dbInfo.Username = strings.TrimSpace(username)
-	fmt.Printf("Password : ")
-	password, _ := reader.ReadString('\n')
-	dbInfo.Password = strings.TrimSpace(password)
-
-	// Crypto
-
+func SetConfig(keyword string) error {
 	ex, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	filenameWithoutExt := strings.TrimSuffix(filepath.Base(ex), filepath.Ext(ex))
-	fp := filepath.Join(filepath.Dir(ex), filenameWithoutExt+".enc")
-	err = crypto.SaveObjectToEncryptedFile(fp, enckey, dbInfo)
-	if err != nil {
-		return err
+	configPath := filepath.Join(filepath.Dir(ex), keyword+".enc")
+	config, _ := GetConfig(configPath)
+
+	fmt.Println("Setting configuration")
+	readInput("db.hostname", config)
+	readInput("db.port", config)
+	readInput("db.username", config)
+	readInput("db.password", config)
+	readInput("db.database", config)
+
+	err = crypto.SaveObjectToEncryptedFile(configPath, enckey, config)
+	return err
+}
+
+func readInput(key string, config map[string]string) {
+	if val, ok := config[key]; ok && len(val) > 0 {
+		fmt.Printf("%-15s = (%s) ", key, val)
+	} else {
+		fmt.Printf("%-15s = ", key)
 	}
-	return nil
+
+	reader := bufio.NewReader(os.Stdin)
+	newVal, _ := reader.ReadString('\n')
+	newVal = strings.TrimSpace(newVal)
+	if len(newVal) > 0 {
+		config[key] = newVal
+	}
 }

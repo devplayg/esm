@@ -26,7 +26,6 @@ func NewInputor(interval int64, dir string) *Inputor {
 }
 
 func (e *Inputor) Start(errChan chan<- error) error {
-
 	go func() {
 		for {
 			o := orm.NewOrm()
