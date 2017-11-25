@@ -14,6 +14,7 @@ import (
 	"github.com/devplayg/golibs/crypto"
 	"github.com/devplayg/golibs/orm"
 	log "github.com/sirupsen/logrus"
+	"errors"
 )
 
 var enckey = []byte("DEVPLAYG_ENCKEY_")
@@ -64,6 +65,15 @@ func InitDatabase(keyword string) error {
 	return err
 }
 
+//func CheckConfig(keyword string) error {
+//	ex, err := os.Executable()
+//	if err != nil {
+//		return err
+//	}
+//	configPath := filepath.Join(filepath.Dir(ex), keyword+".enc")
+//
+//}
+
 func LogDrain(errChan <-chan error) {
 	for {
 		select {
@@ -105,22 +115,20 @@ func LoadObject(path string, object interface{}) error {
 }
 
 func GetConfig(configPath string) (map[string]string, error) {
-	config := make(map[string]string)
-
-	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
-		err2 := crypto.LoadEncryptedObjectFile(configPath, enckey, &config)
-		return config, err2
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return nil, errors.New("Configuration not found ")
+	} else {
+		config := make(map[string]string)
+		err := crypto.LoadEncryptedObjectFile(configPath, enckey, &config)
+		return config, err
 	}
-	return config, nil
 }
 
-func SetConfig(keyword string) error {
-	ex, err := os.Executable()
-	if err != nil {
-		return err
+func SetConfig(configPath string) error {
+	config, err := GetConfig(configPath)
+	if config == nil {
+		config = make(map[string]string)
 	}
-	configPath := filepath.Join(filepath.Dir(ex), keyword+".enc")
-	config, _ := GetConfig(configPath)
 
 	fmt.Println("Setting configuration")
 	readInput("db.hostname", config)

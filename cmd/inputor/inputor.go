@@ -12,6 +12,7 @@ import (
 	"github.com/devplayg/siem/inputor"
 	//"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"path/filepath"
 )
 
 const (
@@ -30,12 +31,12 @@ func main() {
 	// Flags
 	fs = flag.NewFlagSet("", flag.ExitOnError)
 	var (
-		version  = fs.Bool("v", false, "Version")
-		debug    = fs.Bool("debug", false, "Debug")
-		cpu      = fs.Int("cpu", 1, "CPU Count")
-		config   = fs.Bool("config", false, "Set configuration")
-		interval = fs.Int64("i", 10000, "Interval(ms)")
-		watchDir = fs.String("dir", "/home/sniper_bps/relation/", "Directory to watch")
+		version   = fs.Bool("v", false, "Version")
+		debug     = fs.Bool("debug", false, "Debug")
+		cpu       = fs.Int("cpu", 1, "CPU Count")
+		setConfig = fs.Bool("config", false, "Set configuration")
+		interval  = fs.Int64("i", 10000, "Interval(ms)")
+		watchDir  = fs.String("dir", "/home/sniper_bps/relation/", "Directory to watch")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
@@ -54,12 +55,22 @@ func main() {
 	}
 
 	// Config
-	if *config {
-		err := siem.SetConfig(ProductKeyword)
+	ex, err := os.Executable()
+	if err != nil {
+		log.Error(err)
+	}
+	configPath := filepath.Join(filepath.Dir(ex), ProductKeyword+".enc")
+
+	if *setConfig {
+		err := siem.SetConfig(configPath)
 		if err != nil {
 			log.Error(err)
 		}
 		return
+	}
+	config, _ := siem.GetConfig(ProductKeyword)
+	if config == nil {
+		log.Fatal("Configuration not found")
 	}
 
 	// Initialize database
