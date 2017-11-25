@@ -1,14 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path/filepath"
 	"runtime"
-	"strconv"
 
 	"github.com/devplayg/siem"
 	"github.com/devplayg/siem/stats"
@@ -18,7 +17,7 @@ import (
 
 const (
 	ProductName       = "SNIPER APTX-T Statistics Manager"
-	ProductKeyword    = "esmstats"
+	ProductKeyword    = "stats"
 	ProductVersion    = "2.0"
 	DefaultServerAddr = ":8080"
 )
@@ -28,14 +27,14 @@ var (
 )
 
 func main() {
-
 	// Flags
 	fs = flag.NewFlagSet("", flag.ExitOnError)
 	var (
-		version  = fs.Bool("v", false, "Version")
-		debug    = fs.Bool("d", false, "Debug")
-		cpu      = fs.Int("cpu", 1, "CPU Count")
-		interval = fs.Int64("i", 10000, "Interval(ms)")
+		version   = fs.Bool("v", false, "Version")
+		debug     = fs.Bool("debug", false, "Debug")
+		cpu       = fs.Int("cpu", 1, "CPU Count")
+		setConfig = fs.Bool("config", false, "Set configuration")
+		interval  = fs.Int64("i", 10000, "Interval(ms)")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
@@ -48,78 +47,59 @@ func main() {
 
 	// Debug
 	if *debug {
-		esm.InitLogger(log.DebugLevel, ProductKeyword)
+		siem.InitLogger(log.DebugLevel, ProductKeyword)
 	} else {
-		esm.InitLogger(log.InfoLevel, ProductKeyword)
+		siem.InitLogger(log.InfoLevel, ProductKeyword)
+	}
+
+	// Config
+	ex, err := os.Executable()
+	if err != nil {
+		log.Error(err)
+	}
+	configPath := filepath.Join(filepath.Dir(ex), ProductKeyword+".enc")
+
+	if *setConfig {
+		err := siem.SetConfig(configPath)
+		if err != nil {
+			log.Error(err)
+		}
+		return
+	}
+	config, _ := siem.GetConfig(ProductKeyword)
+	if config == nil {
+		log.Fatal("Configuration not found")
+	}
+
+	// Initialize database
+	if err := siem.InitDatabase(ProductKeyword); err != nil {
+		log.Fatal(err)
 	}
 
 	// CPU
 	runtime.GOMAXPROCS(*cpu)
+	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
 
-	// Start
+	// Logging
 	errChan := make(chan error)
-	go esm.LogDrain(errChan)
+	go siem.LogDrain(errChan)
 
-	// Initialize database
-	if err := esm.InitDatabase("127.0.0.1", 3306, "root", "sniper123!@#", "aptxm"); err != nil {
-		log.Fatal(err)
-	}
-
-	// Start engine
+	// Start statistics
 	statist := stats.NewStatist(*interval)
 	statist.Start(errChan)
+	log.Info("Started")
 
 	// Start http server
 	r := mux.NewRouter()
-	r.HandleFunc("/rank/{groupid:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
+	//	r.HandleFunc("/rank/{groupid:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
 	r.PathPrefix("/debug").Handler(http.DefaultServeMux)
-
 	log.Fatal(http.ListenAndServe(DefaultServerAddr, r))
 
 	// Wait
-	esm.WaitForSignals()
+	siem.WaitForSignals()
 }
 
 func printHelp() {
 	fmt.Println(ProductKeyword)
 	fs.PrintDefaults()
 }
-
-func rankHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	groupId, _ := strconv.Atoi(vars["groupid"])
-	top, _ := strconv.Atoi(vars["top"])
-
-	list := stats.GetRank(groupId, vars["category"], top)
-	buf, _ := json.Marshal(list)
-	w.Write(buf)
-}
-
-//SpecialBuild
-//ProductVersion
-//ProductPrivatePart
-//ProductName
-//ProductMinorPart
-//ProductMajorPart
-//ProductBuildPart
-//PrivateBuild
-//OriginalFilename
-//LegalTrademarks
-//LegalCopyright
-//IsSpecialBuild
-//IsPreRelease
-//IsPrivateBuild
-//IsPatched
-//IsDebug
-//InternalName
-//FileVersion
-//FilePrivatePart
-//FileName
-//FileMinorPart
-//FileMajorPart
-//FileDescription
-//FileBuildPart
-//CompanyName
-//Comments
-//FileVersionInfo Class

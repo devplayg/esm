@@ -6,20 +6,20 @@ import (
 	//"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/devplayg/siem"
 	"github.com/devplayg/siem/inputor"
 	//"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
-	"path/filepath"
 )
 
 const (
-	ProductName       = "SNIPER APTX-T Data Inputor"
-	ProductKeyword    = "inputor"
-	ProductVersion    = "2.0"
-	DefaultServerAddr = "127.0.0.1:8080"
+	ProductName    = "SNIPER APTX-T Data Inputor"
+	ProductKeyword = "inputor"
+	ProductVersion = "2.0"
+	//DefaultServerAddr = "127.0.0.1:8080"
 )
 
 var (
@@ -86,7 +86,7 @@ func main() {
 	errChan := make(chan error)
 	go siem.LogDrain(errChan)
 
-	// Start engine
+	// Start inputor
 	inputor := inputor.NewInputor(*interval, *watchDir)
 	inputor.Start(errChan)
 	log.Info("Started")
