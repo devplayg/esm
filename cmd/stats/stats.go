@@ -68,7 +68,7 @@ func main() {
 	}
 	config, _ := siem.GetConfig(ProductKeyword)
 	if config == nil {
-		log.Fatal("Configuration not found")
+		log.Fatal("Configuration not found.(Use '-config' option)")
 	}
 
 	// Initialize database
