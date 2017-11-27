@@ -40,6 +40,7 @@ func InitLogger(level log.Level, keyword string) {
 	// Set log level
 	log.SetLevel(level)
 	if log.GetLevel() != log.InfoLevel {
+		fmt.Printf("logLevel=%s, logFile=%s\n", log.GetLevel(), logFile)
 		log.Infof("LoggingLevel=%s(%s)", log.GetLevel(), logFile)
 	}
 }

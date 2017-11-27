@@ -66,7 +66,7 @@ func main() {
 		}
 		return
 	}
-	config, _ := siem.GetConfig(ProductKeyword)
+	config, _ := siem.GetConfig(configPath)
 	if config == nil {
 		log.Fatal("Configuration not found.(Use '-config' option)")
 	}
