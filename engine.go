@@ -11,10 +11,11 @@ import (
 	"syscall"
 	//"github.com/davecgh/go-spew/spew"
 
+	"errors"
+
 	"github.com/devplayg/golibs/crypto"
 	"github.com/devplayg/golibs/orm"
 	log "github.com/sirupsen/logrus"
-	"errors"
 )
 
 var enckey = []byte("DEVPLAYG_ENCKEY_")
@@ -26,12 +27,6 @@ func InitLogger(level log.Level, keyword string) {
 		DisableColors: true,
 	})
 
-	// Set log level
-	log.SetLevel(level)
-	if log.GetLevel() != log.InfoLevel {
-		log.Infof("Logging level=%s", log.GetLevel())
-	}
-
 	// Set log file
 	logFile := filepath.Join("/var/log", keyword+".log")
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
@@ -40,6 +35,12 @@ func InitLogger(level log.Level, keyword string) {
 	} else {
 		//		log.Error("Failed to log to file, using default stderr")
 		log.SetOutput(os.Stdout)
+	}
+
+	// Set log level
+	log.SetLevel(level)
+	if log.GetLevel() != log.InfoLevel {
+		log.Infof("LoggingLevel=%s(%s)", log.GetLevel(), logFile)
 	}
 }
 
