@@ -11,8 +11,6 @@ import (
 	//"github.com/gorilla/mux"
 	"github.com/devplayg/siem/inputor"
 	log "github.com/sirupsen/logrus"
-	"github.com/blevesearch/bleve/analysis/lang/in"
-	"github.com/ekanite/ekanite/input"
 )
 
 const (
