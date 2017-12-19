@@ -18,9 +18,24 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var enckey = []byte("DEVPLAYG_ENCKEY_")
+type Engine struct {
+	debug       bool
+	processName string
+	logOutput   int // 0: STDOUT, 1: File
+}
 
-func InitLogger(level log.Level, keyword string) {
+func NewEngine(debug bool) *Engine {
+	return &Engine{
+		processName: strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0])),
+		debug:       debug,
+	}
+}
+
+func (e *Engine) Start(level log.Level) error {
+
+}
+
+func (e *Engine) InitLogger(level log.Level) error {
 	// Set log format
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:   true,
@@ -28,10 +43,43 @@ func InitLogger(level log.Level, keyword string) {
 	})
 
 	// Set log file
-	logFile := filepath.Join("/var/log", keyword+".log")
+	logFile := filepath.Join("/var/log", e.processName+".log")
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err == nil {
 		log.SetOutput(file)
+		e.logOutput = 1
+		fmt.Printf("Output: %s\n", file)
+	} else {
+		//		log.Error("Failed to log to file, using default stderr")
+		e.logOutput = 0
+		log.SetOutput(os.Stdout)
+	}
+
+	// Set log level
+	log.SetLevel(level)
+	if log.GetLevel() != log.InfoLevel {
+		log.Infof("LoggingLevel=%s(%s)", log.GetLevel(), logFile)
+	}
+
+	return nil
+}
+
+var enckey = []byte("DEVPLAYG_ENCKEY_")
+
+func InitLogger(level log.Level) {
+	processName := strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0]))
+	// Set log format
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:   true,
+		DisableColors: true,
+	})
+
+	// Set log file
+	logFile := filepath.Join("/var/log", processName+".log")
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+	if err == nil {
+		log.SetOutput(file)
+		fmt.Printf("Output: %s\n", file)
 	} else {
 		//		log.Error("Failed to log to file, using default stderr")
 		log.SetOutput(os.Stdout)
