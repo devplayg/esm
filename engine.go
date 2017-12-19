@@ -2,8 +2,8 @@ package siem
 
 import (
 	"bufio"
-	"encoding/gob"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,26 +16,51 @@ import (
 	"github.com/devplayg/golibs/crypto"
 	"github.com/devplayg/golibs/orm"
 	log "github.com/sirupsen/logrus"
+	"runtime"
 )
 
+var enckey = []byte("DEVPLAYG_ENCKEY_")
+
 type Engine struct {
+	ConfigPath  string
+	Config      map[string]string
+	Interval    int64
 	debug       bool
+	cpuCount    int
 	processName string
 	logOutput   int // 0: STDOUT, 1: File
 }
 
-func NewEngine(debug bool) *Engine {
-	return &Engine{
+func NewEngine(debug bool, cpuCount int, interval int64) *Engine {
+	e := Engine{
 		processName: strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0])),
+		cpuCount:    cpuCount,
 		debug:       debug,
+		Interval:    interval,
 	}
+	e.ConfigPath = filepath.Join(filepath.Dir(os.Args[0]), e.processName+".enc")
+	e.initLogger()
+	return &e
 }
 
-func (e *Engine) Start(level log.Level) error {
+func (e *Engine) Start() error {
+	runtime.GOMAXPROCS(e.cpuCount)
+	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
+	config, err := e.getConfig()
+	if err != nil {
+		return err
+	}
+	e.Config = config
 
+	err = e.initDatabase()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (e *Engine) InitLogger(level log.Level) error {
+func (e *Engine) initLogger() error {
+
 	// Set log format
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:   true,
@@ -56,62 +81,57 @@ func (e *Engine) InitLogger(level log.Level) error {
 	}
 
 	// Set log level
-	log.SetLevel(level)
+	if e.debug {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
 	if log.GetLevel() != log.InfoLevel {
-		log.Infof("LoggingLevel=%s(%s)", log.GetLevel(), logFile)
+		log.Infof("LoggingLevel=%s", log.GetLevel())
 	}
 
 	return nil
 }
 
-var enckey = []byte("DEVPLAYG_ENCKEY_")
+//func InitLogger(level log.Level) {
+//	processName := strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0]))
+//	// Set log format
+//	log.SetFormatter(&log.TextFormatter{
+//		ForceColors:   true,
+//		DisableColors: true,
+//	})
+//
+//	// Set log file
+//	logFile := filepath.Join("/var/log", processName+".log")
+//	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+//	if err == nil {
+//		log.SetOutput(file)
+//		fmt.Printf("Output: %s\n", file)
+//	} else {
+//		//		log.Error("Failed to log to file, using default stderr")
+//		log.SetOutput(os.Stdout)
+//	}
+//
+//	// Set log level
+//	log.SetLevel(level)
+//	if log.GetLevel() != log.InfoLevel {
+//		fmt.Printf("logLevel=%s, logFile=%s\n", log.GetLevel(), logFile)
+//		log.Infof("LoggingLevel=%s(%s)", log.GetLevel(), logFile)
+//	}
+//}
 
-func InitLogger(level log.Level) {
-	processName := strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0]))
-	// Set log format
-	log.SetFormatter(&log.TextFormatter{
-		ForceColors:   true,
-		DisableColors: true,
-	})
-
-	// Set log file
-	logFile := filepath.Join("/var/log", processName+".log")
-	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-	if err == nil {
-		log.SetOutput(file)
-		fmt.Printf("Output: %s\n", file)
-	} else {
-		//		log.Error("Failed to log to file, using default stderr")
-		log.SetOutput(os.Stdout)
-	}
-
-	// Set log level
-	log.SetLevel(level)
-	if log.GetLevel() != log.InfoLevel {
-		fmt.Printf("logLevel=%s, logFile=%s\n", log.GetLevel(), logFile)
-		log.Infof("LoggingLevel=%s(%s)", log.GetLevel(), logFile)
-	}
-}
-
-func InitDatabase(keyword string) error {
-	ex, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	configPath := filepath.Join(filepath.Dir(ex), keyword+".enc")
-	config, err := GetConfig(configPath)
-	if err != nil {
-		return err
-	}
-	connStr := fmt.Sprintf(`%s:%s@tcp(%s:%s)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s`,
-		config["db.username"],
-		config["db.password"],
-		config["db.hostname"],
-		config["db.port"],
-		config["db.database"],
+func (e *Engine) initDatabase() error {
+	connStr := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s",
+		e.Config["db.username"],
+		e.Config["db.password"],
+		e.Config["db.hostname"],
+		e.Config["db.port"],
+		e.Config["db.database"],
 		"Asia%2FSeoul")
 	log.Debugf("Database connection string: %s", connStr)
-	err = orm.RegisterDataBase("default", "mysql", connStr, 3, 3)
+	err := orm.RegisterDataBase("default", "mysql", connStr, 3, 3)
 	return err
 }
 
@@ -123,17 +143,17 @@ func InitDatabase(keyword string) error {
 //	configPath := filepath.Join(filepath.Dir(ex), keyword+".enc")
 //
 //}
-
-func LogDrain(errChan <-chan error) {
-	for {
-		select {
-		case err := <-errChan:
-			if err != nil {
-				log.Error(err.Error())
-			}
-		}
-	}
-}
+//
+//func LogDrain(errChan <-chan error) {
+//	for {
+//		select {
+//		case err := <-errChan:
+//			if err != nil {
+//				log.Error(err.Error())
+//			}
+//		}
+//	}
+//}
 
 func WaitForSignals() {
 	signalCh := make(chan os.Signal, 1)
@@ -144,63 +164,40 @@ func WaitForSignals() {
 	}
 }
 
-func SaveObject(path string, object interface{}) error {
-	file, err := os.Create(path)
-	if err == nil {
-		encoder := gob.NewEncoder(file)
-		encoder.Encode(object)
-	}
-	file.Close()
-	return err
-}
-
-func LoadObject(path string, object interface{}) error {
-	file, err := os.Open(path)
-	if err == nil {
-		decoder := gob.NewDecoder(file)
-		err = decoder.Decode(object)
-	}
-	file.Close()
-	return err
-}
-
-func GetConfig(configPath string) (map[string]string, error) {
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, errors.New("Configuration file not found ")
+func (e *Engine) getConfig() (map[string]string, error) {
+	if _, err := os.Stat(e.ConfigPath); os.IsNotExist(err) {
+		return nil, errors.New("Configuration file not found: " + filepath.Base(e.ConfigPath))
 	} else {
 		config := make(map[string]string)
-		err := crypto.LoadEncryptedObjectFile(configPath, enckey, &config)
+		err := crypto.LoadEncryptedObjectFile(e.ConfigPath, enckey, &config)
 		return config, err
 	}
 }
 
-func SetConfig(configPath string, extra string) error {
-	config, err := GetConfig(configPath)
+func (e *Engine) SetConfig(extra string) error {
+	config, err := e.getConfig()
 	if config == nil {
 		config = make(map[string]string)
 	}
 
 	fmt.Println("Setting configuration")
-	readInput("db.hostname", config)
-	readInput("db.port", config)
-	readInput("db.username", config)
-	readInput("db.password", config)
-	readInput("db.database", config)
+	e.readInput("db.hostname", config)
+	e.readInput("db.port", config)
+	e.readInput("db.username", config)
+	e.readInput("db.password", config)
+	e.readInput("db.database", config)
 
 	if len(extra) > 0 {
 		arr := strings.Split(extra, ",")
 		for _, k := range arr {
-			readInput(k, config)
+			e.readInput(k, config)
 		}
 	}
-	//	fmt.Println(configPath)
-	//	readInput("storage.home", config)
-
-	err = crypto.SaveObjectToEncryptedFile(configPath, enckey, config)
+	err = crypto.SaveObjectToEncryptedFile(e.ConfigPath, enckey, config)
 	return err
 }
 
-func readInput(key string, config map[string]string) {
+func (e *Engine) readInput(key string, config map[string]string) {
 	if val, ok := config[key]; ok && len(val) > 0 {
 		fmt.Printf("%-15s = (%s) ", key, val)
 	} else {

@@ -14,86 +14,120 @@ import (
 )
 
 type Inputor struct {
-	dir      string
-	interval int64
+	dir    string
+	engine *siem.Engine
 }
 
-func NewInputor(interval int64, dir string) *Inputor {
+func NewInputor(engine *siem.Engine) *Inputor {
 	return &Inputor{
-		dir:      dir,
-		interval: interval,
+		dir:    engine.Config["storage.watchDir"],
+		engine: engine,
 	}
 }
 
-func (e *Inputor) Start(errChan chan<- error) error {
+func (i *Inputor) Start() error {
 	go func() {
 		for {
 
 			// Read sensors
 			sensors, err := siem.GetSensors()
 			if err != nil {
-				errChan <- err
+				log.Error(err)
 				continue
 			}
-
+			//
 			// Read files in home directory and insert into tables
 			for _, s := range sensors {
-				dir := filepath.Join(e.dir, s.Ip)
-				log.Debugf("Reading directory in %s", dir)
+				targetDir := filepath.Join(i.dir, s.Ip)
+				log.Debugf("Reading directory in %s", targetDir)
 
 				// If directory exists
-				if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
-					err := e.Insert(dir, errChan)
+				if stat, err := os.Stat(targetDir); err == nil && stat.IsDir() {
+					err := i.Insert(targetDir)
 					if err != nil {
-						errChan <- err
+						log.Error(err)
 						continue
 					}
 				}
 			}
-			log.Debugf("Reading directory in %s", e.dir)
-			e.Insert(e.dir, errChan)
+			log.Debugf("Reading directory in %s", i.dir)
+			i.Insert(filepath.Join(i.dir))
 
 			// Sleep
-			log.Debugf("Sleep %3.1fs", (time.Duration(e.interval) * time.Millisecond).Seconds())
-			time.Sleep(time.Duration(e.interval) * time.Millisecond)
+			log.Debugf("Sleep %3.1fs", (time.Duration(i.engine.Interval) * time.Millisecond).Seconds())
+
+			time.Sleep(time.Duration(i.engine.Interval) * time.Millisecond)
 		}
 	}()
 
 	return nil
 }
 
-func (e *Inputor) Insert(dir string, errChan chan<- error) error {
+func (i *Inputor) Insert(dir string) error {
 	o := orm.NewOrm()
+	files, err := filepath.Glob(filepath.Join(dir, "*.[123]"))
+	if err != nil {
+		return err
+	}
 
-	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-		if !f.IsDir() {
-			var e1 error
+	for _, f := range files {
+		fi, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
 
-			if strings.HasSuffix(path, ".1") {
-				e1 = e.insertEvent1(o, path)
+		var e error
+		if !fi.IsDir() {
+			fname := filepath.Join(dir, fi.Name())
+			if strings.HasSuffix(fname, ".1") {
+				e = i.insertEvent1(o, fname)
 
-			} else if strings.HasSuffix(path, ".2") {
-				e1 = e.insertEvent2(o, path)
+			} else if strings.HasSuffix(fname, ".2") {
+				e = i.insertEvent2(o, fname)
 
-			} else if strings.HasSuffix(path, ".3") {
-				e1 = e.insertEvent3(o, path)
+			} else if strings.HasSuffix(fname, ".3") {
+				e = i.insertEvent3(o, fname)
 			} else {
-				os.Remove(path)
+				os.Remove(fname)
 			}
-			if e1 != nil {
-				errChan <- e1
-				log.Error(path)
-				os.Rename(path, path+".err")
+			if e != nil {
+				log.Error(e)
+				os.Rename(fname, fname+".err")
 			} else {
-				os.Remove(path)
+				os.Remove(fname)
 			}
 		}
-		return nil
-	})
+	}
+
+	//err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+	//	if !f.IsDir() {
+	//		log.Info(path)
+	//		var e1 error
+	//
+	//		if strings.HasSuffix(path, ".1") {
+	//			e1 = i.insertEvent1(o, path)
+	//
+	//		} else if strings.HasSuffix(path, ".2") {
+	//			e1 = i.insertEvent2(o, path)
+	//
+	//		} else if strings.HasSuffix(path, ".3") {
+	//			e1 = i.insertEvent3(o, path)
+	//		} else {
+	//			os.Remove(path)
+	//		}
+	//		if e1 != nil {
+	//			log.Error(path)
+	//			os.Rename(path, path+".err")
+	//		} else {
+	//			os.Remove(path)
+	//		}
+	//	}
+	//	return nil
+	//})
 	return err
 }
 
-func (e *Inputor) insertEvent1(o orm.Ormer, path string) error {
+func (i *Inputor) insertEvent1(o orm.Ormer, path string) error {
 	query := `
 		LOAD DATA LOCAL INFILE '%s'
 		INTO TABLE log_event_filetrans
@@ -139,7 +173,7 @@ func (e *Inputor) insertEvent1(o orm.Ormer, path string) error {
 	return err
 }
 
-func (e *Inputor) insertEvent2(o orm.Ormer, path string) error {
+func (i *Inputor) insertEvent2(o orm.Ormer, path string) error {
 	query := `
 		LOAD DATA LOCAL INFILE '%s'
 		INTO TABLE log_event_common
@@ -178,7 +212,7 @@ func (e *Inputor) insertEvent2(o orm.Ormer, path string) error {
 	return err
 }
 
-func (e *Inputor) insertEvent3(o orm.Ormer, path string) error {
+func (i *Inputor) insertEvent3(o orm.Ormer, path string) error {
 	query := `
 		LOAD DATA LOCAL INFILE '%s'
 		REPLACE INTO TABLE pol_file_md5

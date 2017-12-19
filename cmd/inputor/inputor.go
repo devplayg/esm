@@ -4,13 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
+	//"runtime"
 
 	"github.com/devplayg/siem"
-	"github.com/devplayg/siem/inputor"
+	//"github.com/devplayg/siem/inputor"
 	//"github.com/gorilla/mux"
+	"github.com/devplayg/siem/inputor"
 	log "github.com/sirupsen/logrus"
+	"github.com/blevesearch/bleve/analysis/lang/in"
+	"github.com/ekanite/ekanite/input"
 )
 
 const (
@@ -24,15 +26,14 @@ var (
 )
 
 func main() {
-
 	// Flags
 	fs = flag.NewFlagSet("", flag.ExitOnError)
 	var (
 		version   = fs.Bool("v", false, "Version")
 		debug     = fs.Bool("debug", false, "Debug")
-		cpu       = fs.Int("cpu", 1, "CPU Count")
+		cpu       = fs.Int("cpu", 2, "CPU Count")
 		setConfig = fs.Bool("config", false, "Set configuration")
-		interval  = fs.Int64("i", 10000, "Interval(ms)")
+		interval  = fs.Int64("i", 2000, "Interval(ms)")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
@@ -43,55 +44,22 @@ func main() {
 		return
 	}
 
-	// Start engine
-	engine := siem.NewEngine(*debug)
-
-	//	// Debug
-	//	if *debug {
-	//		siem.InitLogger(log.DebugLevel)
-	//	} else {
-	//		siem.InitLogger(log.InfoLevel)
-	//	}
-
-	// Config
-	ex, err := os.Executable()
-	if err != nil {
-		log.Error(err)
-	}
-	configPath := filepath.Join(filepath.Dir(ex), ProductKeyword+".enc")
-
+	engine := siem.NewEngine(*debug, *cpu, *interval)
 	if *setConfig {
-		err := siem.SetConfig(configPath, "storage.watchDir")
+		err := engine.SetConfig("storage.watchDir")
 		if err != nil {
 			log.Error(err)
+		} else {
+			log.Info("Done")
 		}
-		return
 	}
-	config, _ := siem.GetConfig(configPath)
-	if config == nil {
-		msg := "Configuration file not found.(Use '-config' option)"
-		fmt.Println(msg)
-		log.Fatal(msg)
-		return
+	if err := engine.Start(); err != nil {
+		log.Error(err)
 	}
 
-	// Initialize database
-	if err := siem.InitDatabase(ProductKeyword); err != nil {
-		log.Fatal(err)
-	}
-
-	// CPU
-	runtime.GOMAXPROCS(*cpu)
-	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
-
-	// Logging
-	errChan := make(chan error)
-	go siem.LogDrain(errChan)
-
-	// Start inputor
-	inputor := inputor.NewInputor(*interval, config["storage.watchDir"])
-	inputor.Start(errChan)
-	log.Info("Started")
+	siemInputor := inputor.NewInputor(engine)
+	siemInputor.Start()
+	//log.Info("Started")
 
 	//// Start http server
 	//r := mux.NewRouter()
