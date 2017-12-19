@@ -70,8 +70,8 @@ func main() {
 	config, _ := siem.GetConfig(configPath)
 	if config == nil {
 		msg := "Configuration file not found.(Use '-config' option)"
-		log.Fatal(msg)
 		fmt.Println(msg)
+		log.Fatal(msg)
 		return
 	}
 
