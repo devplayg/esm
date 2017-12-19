@@ -36,7 +36,6 @@ func main() {
 		cpu       = fs.Int("cpu", 1, "CPU Count")
 		setConfig = fs.Bool("config", false, "Set configuration")
 		interval  = fs.Int64("i", 10000, "Interval(ms)")
-		watchDir  = fs.String("dir", "/home/sniper_bps/relation/", "Directory to watch")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
@@ -62,7 +61,7 @@ func main() {
 	configPath := filepath.Join(filepath.Dir(ex), ProductKeyword+".enc")
 
 	if *setConfig {
-		err := siem.SetConfig(configPath)
+		err := siem.SetConfig(configPath, "storage.watchDir")
 		if err != nil {
 			log.Error(err)
 		}
@@ -70,7 +69,10 @@ func main() {
 	}
 	config, _ := siem.GetConfig(configPath)
 	if config == nil {
-		log.Fatal("Configuration not found.(Use '-config' option)")
+		msg := "Configuration file not found.(Use '-config' option)"
+		log.Fatal(msg)
+		fmt.Println(msg)
+		return
 	}
 
 	// Initialize database
@@ -87,7 +89,7 @@ func main() {
 	go siem.LogDrain(errChan)
 
 	// Start inputor
-	inputor := inputor.NewInputor(*interval, *watchDir)
+	inputor := inputor.NewInputor(*interval, config["storage.watchDir"])
 	inputor.Start(errChan)
 	log.Info("Started")
 

@@ -28,7 +28,6 @@ func NewInputor(interval int64, dir string) *Inputor {
 func (e *Inputor) Start(errChan chan<- error) error {
 	go func() {
 		for {
-			o := orm.NewOrm()
 
 			// Read sensors
 			sensors, err := siem.GetSensors()
@@ -37,45 +36,22 @@ func (e *Inputor) Start(errChan chan<- error) error {
 				continue
 			}
 
-			// Read files home directory and insert into tables
+			// Read files in home directory and insert into tables
 			for _, s := range sensors {
 				dir := filepath.Join(e.dir, s.Ip)
-				log.Debugf("Reading directory: %s", dir)
+				log.Debugf("Reading directory in %s", dir)
 
 				// If directory exists
 				if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
-					err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-						if !f.IsDir() {
-							var e1 error
-
-							if strings.HasSuffix(path, ".1") {
-								e1 = e.insertEvent1(o, path)
-
-							} else if strings.HasSuffix(path, ".2") {
-								e1 = e.insertEvent2(o, path)
-
-							} else if strings.HasSuffix(path, ".3") {
-								e1 = e.insertEvent3(o, path)
-							} else {
-								os.Remove(path)
-							}
-							if e1 != nil {
-								errChan <- e1
-								log.Error(path)
-								os.Rename(path, path+".err")
-							} else {
-								os.Remove(path)
-							}
-						}
-						return nil
-					})
-
+					err := e.Insert(dir, errChan)
 					if err != nil {
 						errChan <- err
 						continue
 					}
 				}
 			}
+			log.Debugf("Reading directory in %s", e.dir)
+			e.Insert(e.dir, errChan)
 
 			// Sleep
 			log.Debugf("Sleep %3.1fs", (time.Duration(e.interval) * time.Millisecond).Seconds())
@@ -84,6 +60,37 @@ func (e *Inputor) Start(errChan chan<- error) error {
 	}()
 
 	return nil
+}
+
+func (e *Inputor) Insert(dir string, errChan chan<- error) error {
+	o := orm.NewOrm()
+
+	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+		if !f.IsDir() {
+			var e1 error
+
+			if strings.HasSuffix(path, ".1") {
+				e1 = e.insertEvent1(o, path)
+
+			} else if strings.HasSuffix(path, ".2") {
+				e1 = e.insertEvent2(o, path)
+
+			} else if strings.HasSuffix(path, ".3") {
+				e1 = e.insertEvent3(o, path)
+			} else {
+				os.Remove(path)
+			}
+			if e1 != nil {
+				errChan <- e1
+				log.Error(path)
+				os.Rename(path, path+".err")
+			} else {
+				os.Remove(path)
+			}
+		}
+		return nil
+	})
+	return err
 }
 
 func (e *Inputor) insertEvent1(o orm.Ormer, path string) error {

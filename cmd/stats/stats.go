@@ -60,7 +60,7 @@ func main() {
 	configPath := filepath.Join(filepath.Dir(ex), ProductKeyword+".enc")
 
 	if *setConfig {
-		err := siem.SetConfig(configPath)
+		err := siem.SetConfig(configPath, "")
 		if err != nil {
 			log.Error(err)
 		}
@@ -68,7 +68,7 @@ func main() {
 	}
 	config, _ := siem.GetConfig(configPath)
 	if config == nil {
-		log.Fatal("Configuration not found.(Use '-config' option)")
+		log.Fatal("Configuration file not found.(Use '-config' option)")
 	}
 
 	// Initialize database

@@ -118,7 +118,7 @@ func LoadObject(path string, object interface{}) error {
 
 func GetConfig(configPath string) (map[string]string, error) {
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, errors.New("Configuration not found ")
+		return nil, errors.New("Configuration file not found ")
 	} else {
 		config := make(map[string]string)
 		err := crypto.LoadEncryptedObjectFile(configPath, enckey, &config)
@@ -126,7 +126,7 @@ func GetConfig(configPath string) (map[string]string, error) {
 	}
 }
 
-func SetConfig(configPath string) error {
+func SetConfig(configPath string, extra string) error {
 	config, err := GetConfig(configPath)
 	if config == nil {
 		config = make(map[string]string)
@@ -138,6 +138,15 @@ func SetConfig(configPath string) error {
 	readInput("db.username", config)
 	readInput("db.password", config)
 	readInput("db.database", config)
+
+	if len(extra) > 0 {
+		arr := strings.Split(extra, ",")
+		for _, k := range arr {
+			readInput(k, config)
+		}
+	}
+	//	fmt.Println(configPath)
+	//	readInput("storage.home", config)
 
 	err = crypto.SaveObjectToEncryptedFile(configPath, enckey, config)
 	return err
