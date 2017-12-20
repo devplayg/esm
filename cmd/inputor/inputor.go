@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	ProductName    = "SNIPER APTX-T 5.0 Data Inputor"
-	ProductVersion = "2.0.1"
+	AppName    = "Data Inputor"
+	AppVersion = "2.0.1"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 
 	// Display version
 	if *version {
-		siem.DisplayVersion(ProductName, ProductVersion)
+		siem.DisplayVersion(AppName, AppVersion)
 		return
 	}
 
