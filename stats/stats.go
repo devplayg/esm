@@ -58,8 +58,8 @@ func (e *Statist) Start() error {
 			rwMutex.Unlock()
 
 			// Sleep
-			log.Debugf("Sleep %3.1fs", (time.Duration(e.interval) * time.Millisecond).Seconds())
-			time.Sleep(time.Duration(e.interval) * time.Millisecond)
+			log.Debugf("Sleep %3.1fs", (time.Duration(e.engine.Interval) * time.Millisecond).Seconds())
+			time.Sleep(time.Duration(e.engine.Interval) * time.Millisecond)
 		}
 	}()
 
