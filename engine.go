@@ -15,15 +15,18 @@ import (
 	"github.com/devplayg/golibs/orm"
 	log "github.com/sirupsen/logrus"
 	"runtime"
+	"crypto/sha256"
 )
 
 var (
 	CmdFlags *flag.FlagSet
-	enckey   = []byte("DEVPLAYG_ENCKEY_")
+	encKey   []byte
 )
 
 func init() {
 	CmdFlags = flag.NewFlagSet("", flag.ExitOnError)
+	key := sha256.Sum256([]byte("D?83F4 E?E"))
+	encKey = key[:]
 }
 
 type Engine struct {
@@ -49,19 +52,22 @@ func NewEngine(debug bool, cpuCount int, interval int64) *Engine {
 }
 
 func (e *Engine) Start() error {
-	runtime.GOMAXPROCS(e.cpuCount)
-	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
 	config, err := e.getConfig()
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
 	}
-	e.Config = config
+	if _, ok := config["db.hostname"]; !ok {
+		return errors.New("Invalid configurations")
+	}
 
 	err = e.initDatabase()
 	if err != nil {
 		return err
 	}
+
+	runtime.GOMAXPROCS(e.cpuCount)
+	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
 	return nil
 }
 
@@ -128,7 +134,7 @@ func (e *Engine) getConfig() (map[string]string, error) {
 		return nil, errors.New("Configuration file not found. Use '-config' option.")
 	} else {
 		config := make(map[string]string)
-		err := crypto.LoadEncryptedObjectFile(e.ConfigPath, enckey, &config)
+		err := crypto.LoadEncryptedObjectFile(e.ConfigPath, encKey, &config)
 		return config, err
 	}
 }
@@ -152,7 +158,7 @@ func (e *Engine) SetConfig(extra string) error {
 			e.readInput(k, config)
 		}
 	}
-	err = crypto.SaveObjectToEncryptedFile(e.ConfigPath, enckey, config)
+	err = crypto.SaveObjectToEncryptedFile(e.ConfigPath, encKey, config)
 	if err == nil {
 		fmt.Println("Done")
 	} else {
