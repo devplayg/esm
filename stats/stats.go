@@ -24,6 +24,7 @@ type StatsMap map[int]map[string]map[interface{}]int64
 type StatsRank map[int]map[string]siem.ItemList
 
 type Statist struct {
+	engine         *siem.Engine
 	interval       int64
 	statsMap       StatsMap
 	statsRank      StatsRank
@@ -31,25 +32,24 @@ type Statist struct {
 	top            int
 }
 
-func NewStatist(interval int64) *Statist {
+func NewStatist(engine *siem.Engine) *Statist {
 	md5Map = sync.Map{}
 
 	return &Statist{
-		interval: interval,
-		top:      10,
+		engine: engine,
 	}
 }
 
-func (e *Statist) Start(errChan chan<- error) error {
+func (e *Statist) Start() error {
 	go func() {
 		for {
 			e.statsMap = make(StatsMap)
 			e.statsRank = make(StatsRank)
 			if err := e.updateMembersAssets(); err != nil {
-				errChan <- err
+				log.Error(err)
 			}
 			if err := e.generateStats(); err != nil {
-				errChan <- err
+				log.Error(err)
 			}
 
 			rwMutex := new(sync.RWMutex)

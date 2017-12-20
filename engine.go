@@ -58,8 +58,9 @@ func (e *Engine) Start() error {
 		return err
 	}
 	if _, ok := config["db.hostname"]; !ok {
-		return errors.New("Invalid configurations")
+		return errors.New("invalid configurations")
 	}
+	e.Config = config
 
 	err = e.initDatabase()
 	if err != nil {
@@ -107,6 +108,7 @@ func (e *Engine) initLogger() error {
 }
 
 func (e *Engine) initDatabase() error {
+
 	connStr := fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s",
 		e.Config["db.username"],
@@ -131,7 +133,7 @@ func WaitForSignals() {
 
 func (e *Engine) getConfig() (map[string]string, error) {
 	if _, err := os.Stat(e.ConfigPath); os.IsNotExist(err) {
-		return nil, errors.New("Configuration file not found. Use '-config' option.")
+		return nil, errors.New("configuration file not found (use '-config' option)")
 	} else {
 		config := make(map[string]string)
 		err := crypto.LoadEncryptedObjectFile(e.ConfigPath, encKey, &config)
@@ -140,25 +142,25 @@ func (e *Engine) getConfig() (map[string]string, error) {
 }
 
 func (e *Engine) SetConfig(extra string) error {
-	config, err := e.getConfig()
-	if config == nil {
-		config = make(map[string]string)
+	e.Config, _ = e.getConfig()
+	if e.Config == nil {
+		e.Config = make(map[string]string)
 	}
 
 	fmt.Println("Setting configuration")
-	e.readInput("db.hostname", config)
-	e.readInput("db.port", config)
-	e.readInput("db.username", config)
-	e.readInput("db.password", config)
-	e.readInput("db.database", config)
+	e.readInput("db.hostname", e.Config)
+	e.readInput("db.port", e.Config)
+	e.readInput("db.username", e.Config)
+	e.readInput("db.password", e.Config)
+	e.readInput("db.database", e.Config)
 
 	if len(extra) > 0 {
 		arr := strings.Split(extra, ",")
 		for _, k := range arr {
-			e.readInput(k, config)
+			e.readInput(k, e.Config)
 		}
 	}
-	err = crypto.SaveObjectToEncryptedFile(e.ConfigPath, encKey, config)
+	err := crypto.SaveObjectToEncryptedFile(e.ConfigPath, encKey, e.Config)
 	if err == nil {
 		fmt.Println("Done")
 	} else {

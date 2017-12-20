@@ -30,12 +30,13 @@ func main() {
 		return
 	}
 
-	// Start engine
+	// Set configurations
 	engine := siem.NewEngine(*debug, *cpu, *interval)
 	if *setConfig {
 		engine.SetConfig("storage.watchDir")
 		return
 	}
+	// Start engine
 	if err := engine.Start(); err != nil {
 		log.Error(err)
 		return
