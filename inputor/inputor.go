@@ -39,15 +39,18 @@ func (i *Inputor) Start() error {
 			// Read files in home directory and insert into tables
 			for _, s := range sensors {
 				targetDir := filepath.Join(i.dir, s.Ip)
-				log.Debugf("Reading directory in %s", targetDir)
+
 
 				// If directory exists
 				if stat, err := os.Stat(targetDir); err == nil && stat.IsDir() {
+					log.Debugf("Reading files in directory: %s", targetDir)
 					err := i.Insert(targetDir)
 					if err != nil {
 						log.Error(err)
 						continue
 					}
+				} else {
+					log.Debugf("Failed to read directory: %s", targetDir)
 				}
 			}
 			log.Debugf("Reading directory in %s", i.dir)

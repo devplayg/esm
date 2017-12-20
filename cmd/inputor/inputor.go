@@ -3,19 +3,17 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	//"runtime"
-
 	"github.com/devplayg/siem"
-	//"github.com/devplayg/siem/inputor"
-	//"github.com/gorilla/mux"
 	"github.com/devplayg/siem/inputor"
+	//"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 const (
 	ProductName    = "SNIPER APTX-T 5.0 Data Inputor"
-	ProductKeyword = "inputor"
 	ProductVersion = "2.0.0"
 )
 
@@ -30,15 +28,15 @@ func main() {
 		version   = fs.Bool("v", false, "Version")
 		debug     = fs.Bool("debug", false, "Debug")
 		cpu       = fs.Int("cpu", 2, "CPU Count")
-		setConfig = fs.Bool("config", false, "Set configuration")
-		interval  = fs.Int64("i", 2000, "Interval(ms)")
+		setConfig = fs.Bool("config", false, "Edit configurations")
+		interval  = fs.Int64("i", 5000, "Interval(ms)")
 	)
 	fs.Usage = printHelp
 	fs.Parse(os.Args[1:])
 
 	// Version
 	if *version {
-		fmt.Printf("%s %s\n", ProductName, ProductVersion)
+		fmt.Printf("%s, %s\n", ProductName, ProductVersion)
 		return
 	}
 
@@ -50,16 +48,18 @@ func main() {
 		} else {
 			log.Info("Done")
 		}
+		return
 	}
 	if err := engine.Start(); err != nil {
 		log.Error(err)
+		return
 	}
 
-	siemInputor := inputor.NewInputor(engine)
-	siemInputor.Start()
-	//log.Info("Started")
+	log.Debug(engine.Config)
+	app := inputor.NewInputor(engine)
+	app.Start()
 
-	//// Start http server
+	// Start http server
 	//r := mux.NewRouter()
 	////	r.HandleFunc("/rank/{groupid:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
 	//r.PathPrefix("/debug").Handler(http.DefaultServeMux)
@@ -70,6 +70,6 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Println(ProductKeyword)
+	fmt.Println(strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0])))
 	fs.PrintDefaults()
 }
