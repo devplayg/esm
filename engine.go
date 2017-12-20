@@ -73,7 +73,7 @@ func (e *Engine) initLogger() error {
 	if err == nil {
 		log.SetOutput(file)
 		e.logOutput = 1
-		fmt.Printf("Output: %s\n", file)
+		fmt.Printf("Output: %s\n", file.Name())
 	} else {
 		//		log.Error("Failed to log to file, using default stderr")
 		e.logOutput = 0
