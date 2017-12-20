@@ -102,31 +102,6 @@ func (i *Inputor) Insert(dir string) error {
 		}
 	}
 
-	//err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-	//	if !f.IsDir() {
-	//		log.Info(path)
-	//		var e1 error
-	//
-	//		if strings.HasSuffix(path, ".1") {
-	//			e1 = i.insertEvent1(o, path)
-	//
-	//		} else if strings.HasSuffix(path, ".2") {
-	//			e1 = i.insertEvent2(o, path)
-	//
-	//		} else if strings.HasSuffix(path, ".3") {
-	//			e1 = i.insertEvent3(o, path)
-	//		} else {
-	//			os.Remove(path)
-	//		}
-	//		if e1 != nil {
-	//			log.Error(path)
-	//			os.Rename(path, path+".err")
-	//		} else {
-	//			os.Remove(path)
-	//		}
-	//	}
-	//	return nil
-	//})
 	return err
 }
 

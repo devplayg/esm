@@ -2,6 +2,8 @@ package siem
 
 import (
 	"bufio"
+	"errors"
+	"flag"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"os"
@@ -9,17 +11,20 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	//"github.com/davecgh/go-spew/spew"
-
-	"errors"
-
 	"github.com/devplayg/golibs/crypto"
 	"github.com/devplayg/golibs/orm"
 	log "github.com/sirupsen/logrus"
 	"runtime"
 )
 
-var enckey = []byte("DEVPLAYG_ENCKEY_")
+var (
+	CmdFlags *flag.FlagSet
+	enckey   = []byte("DEVPLAYG_ENCKEY_")
+)
+
+func init() {
+	CmdFlags = flag.NewFlagSet("", flag.ExitOnError)
+}
 
 type Engine struct {
 	ConfigPath  string
@@ -48,6 +53,7 @@ func (e *Engine) Start() error {
 	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
 	config, err := e.getConfig()
 	if err != nil {
+		fmt.Println(err.Error())
 		return err
 	}
 	e.Config = config
@@ -68,12 +74,12 @@ func (e *Engine) initLogger() error {
 	})
 
 	// Set log file
-	logFile := filepath.Join("/var/log", e.processName+".log")
+	logFile := filepath.Join(filepath.Dir(os.Args[0]), e.processName+".log")
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err == nil {
 		log.SetOutput(file)
 		e.logOutput = 1
-		fmt.Printf("Output: %s\n", file.Name())
+		//fmt.Printf("Output: %s\n", file.Name())
 	} else {
 		//		log.Error("Failed to log to file, using default stderr")
 		e.logOutput = 0
@@ -94,33 +100,6 @@ func (e *Engine) initLogger() error {
 	return nil
 }
 
-//func InitLogger(level log.Level) {
-//	processName := strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0]))
-//	// Set log format
-//	log.SetFormatter(&log.TextFormatter{
-//		ForceColors:   true,
-//		DisableColors: true,
-//	})
-//
-//	// Set log file
-//	logFile := filepath.Join("/var/log", processName+".log")
-//	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-//	if err == nil {
-//		log.SetOutput(file)
-//		fmt.Printf("Output: %s\n", file)
-//	} else {
-//		//		log.Error("Failed to log to file, using default stderr")
-//		log.SetOutput(os.Stdout)
-//	}
-//
-//	// Set log level
-//	log.SetLevel(level)
-//	if log.GetLevel() != log.InfoLevel {
-//		fmt.Printf("logLevel=%s, logFile=%s\n", log.GetLevel(), logFile)
-//		log.Infof("LoggingLevel=%s(%s)", log.GetLevel(), logFile)
-//	}
-//}
-
 func (e *Engine) initDatabase() error {
 	connStr := fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s",
@@ -135,26 +114,6 @@ func (e *Engine) initDatabase() error {
 	return err
 }
 
-//func CheckConfig(keyword string) error {
-//	ex, err := os.Executable()
-//	if err != nil {
-//		return err
-//	}
-//	configPath := filepath.Join(filepath.Dir(ex), keyword+".enc")
-//
-//}
-//
-//func LogDrain(errChan <-chan error) {
-//	for {
-//		select {
-//		case err := <-errChan:
-//			if err != nil {
-//				log.Error(err.Error())
-//			}
-//		}
-//	}
-//}
-
 func WaitForSignals() {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
@@ -166,7 +125,7 @@ func WaitForSignals() {
 
 func (e *Engine) getConfig() (map[string]string, error) {
 	if _, err := os.Stat(e.ConfigPath); os.IsNotExist(err) {
-		return nil, errors.New("Configuration file not found: " + filepath.Base(e.ConfigPath))
+		return nil, errors.New("Configuration file not found. Use '-config' option.")
 	} else {
 		config := make(map[string]string)
 		err := crypto.LoadEncryptedObjectFile(e.ConfigPath, enckey, &config)
@@ -194,14 +153,20 @@ func (e *Engine) SetConfig(extra string) error {
 		}
 	}
 	err = crypto.SaveObjectToEncryptedFile(e.ConfigPath, enckey, config)
+	if err == nil {
+		fmt.Println("Done")
+	} else {
+		fmt.Println(err.Error())
+	}
+
 	return err
 }
 
 func (e *Engine) readInput(key string, config map[string]string) {
 	if val, ok := config[key]; ok && len(val) > 0 {
-		fmt.Printf("%-15s = (%s) ", key, val)
+		fmt.Printf("%-16s = (%s) ", key, val)
 	} else {
-		fmt.Printf("%-15s = ", key)
+		fmt.Printf("%-16s = ", key)
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -211,3 +176,13 @@ func (e *Engine) readInput(key string, config map[string]string) {
 		config[key] = newVal
 	}
 }
+
+func PrintHelp() {
+	fmt.Println(strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0])))
+	CmdFlags.PrintDefaults()
+}
+
+func DisplayVersion(prodName, version string) {
+	fmt.Printf("%s, v%s\n", prodName, version)
+}
+

@@ -1,63 +1,51 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"github.com/devplayg/siem"
 	"github.com/devplayg/siem/inputor"
 	//"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (
 	ProductName    = "SNIPER APTX-T 5.0 Data Inputor"
-	ProductVersion = "2.0.0"
-)
-
-var (
-	fs *flag.FlagSet
+	ProductVersion = "2.0.1"
 )
 
 func main() {
-	// Flags
-	fs = flag.NewFlagSet("", flag.ExitOnError)
 	var (
-		version   = fs.Bool("v", false, "Version")
-		debug     = fs.Bool("debug", false, "Debug")
-		cpu       = fs.Int("cpu", 2, "CPU Count")
-		setConfig = fs.Bool("config", false, "Edit configurations")
-		interval  = fs.Int64("i", 5000, "Interval(ms)")
+		version   = siem.CmdFlags.Bool("v", false, "Version")
+		debug     = siem.CmdFlags.Bool("debug", false, "Debug")
+		cpu       = siem.CmdFlags.Int("cpu", 2, "CPU Count")
+		setConfig = siem.CmdFlags.Bool("config", false, "Edit configurations")
+		interval  = siem.CmdFlags.Int64("i", 5000, "Interval(ms)")
 	)
-	fs.Usage = printHelp
-	fs.Parse(os.Args[1:])
+	siem.CmdFlags.Usage = siem.PrintHelp
+	siem.CmdFlags.Parse(os.Args[1:])
 
-	// Version
+	// Display version
 	if *version {
-		fmt.Printf("%s, %s\n", ProductName, ProductVersion)
+		siem.DisplayVersion(ProductName, ProductVersion)
 		return
 	}
 
+	// Start engine
 	engine := siem.NewEngine(*debug, *cpu, *interval)
 	if *setConfig {
-		err := engine.SetConfig("storage.watchDir")
-		if err != nil {
-			log.Error(err)
-		} else {
-			log.Info("Done")
-		}
+		engine.SetConfig("storage.watchDir")
 		return
 	}
 	if err := engine.Start(); err != nil {
 		log.Error(err)
 		return
 	}
-
 	log.Debug(engine.Config)
+
+	// Start application
 	app := inputor.NewInputor(engine)
 	app.Start()
+	log.Info("Started")
 
 	// Start http server
 	//r := mux.NewRouter()
@@ -65,11 +53,6 @@ func main() {
 	//r.PathPrefix("/debug").Handler(http.DefaultServeMux)
 	//log.Fatal(http.ListenAndServe(DefaultServerAddr, r))
 
-	// Wait
+	// Wait for signal
 	siem.WaitForSignals()
-}
-
-func printHelp() {
-	fmt.Println(strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0])))
-	fs.PrintDefaults()
 }
