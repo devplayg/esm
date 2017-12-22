@@ -23,22 +23,20 @@ var (
 	ranker statsRank
 )
 
-// Code / Category / Key / Count
-type statsMap map[int]map[string]map[interface{}]int64
-
-// Code / Category / Key / Ranking
-type statsRank map[int]map[string]siem.ItemList
-
+type statsMap map[int]map[string]map[interface{}]int64 // Code / Category / Key / Count
+type statsRank map[int]map[string]siem.ItemList // Code / Category / Key / Ranking
 type statsCal struct {
+	statsName      string
 	engine         *siem.Engine
 	statsMap       statsMap
 	statsRank      statsRank
 	membersByAsset map[int][]int
 }
 
-func NewStatsCal(engine *siem.Engine) *statsCal {
+func NewStatsCal(statsName string, engine *siem.Engine) *statsCal {
 	return &statsCal{
-		engine: engine,
+		statsName: statsName,
+		engine:    engine,
 	}
 }
 
@@ -66,9 +64,9 @@ func (e *statsCal) Start() error {
 	}()
 
 	go e.openHttpApi()
+	log.Debugf("Stats(%s) stated", e.statsName)
 	return nil
 }
-
 
 func (e *statsCal) generateStats() error {
 	t1 := time.Now()

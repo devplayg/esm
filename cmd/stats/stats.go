@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	AppName           = "statscal"
-	AppVersion        = "2.0.1"
+	AppName           = "stats"
+	AppVersion        = "2.0.2"
 	DefaultServerAddr = "127.0.0.1:8080"
 )
 
@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// Set configurations
-	engine := siem.NewEngine(*debug, *cpu, *interval)
+	engine := siem.NewEngine(AppName, *debug, *cpu, *interval)
 	if *setConfig {
 		engine.SetConfig("server.addr")
 		return
@@ -46,9 +46,18 @@ func main() {
 	log.Debug(engine.Config)
 
 	// Start application
-	app := stats.NewStatsCal(engine)
+	app := stats.NewStatsCal("nsFiletrans", engine)
 	app.Start()
-	log.Info("Started")
+
+
+	/*
+
+	nsFileTransStats := stats.NewNsFileTransStatsCal(engine)
+	nsFileTransStats.Start()
+
+
+	 */
+
 
 	// Wait for signal
 	siem.WaitForSignals()

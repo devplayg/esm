@@ -33,14 +33,16 @@ type Engine struct {
 	ConfigPath  string
 	Config      map[string]string
 	Interval    int64
+	appName string
 	debug       bool
 	cpuCount    int
 	processName string
 	logOutput   int // 0: STDOUT, 1: File
 }
 
-func NewEngine(debug bool, cpuCount int, interval int64) *Engine {
+func NewEngine(appName string, debug bool, cpuCount int, interval int64) *Engine {
 	e := Engine{
+		appName: appName,
 		processName: strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0])),
 		cpuCount:    cpuCount,
 		debug:       debug,
@@ -68,6 +70,7 @@ func (e *Engine) Start() error {
 	}
 
 	runtime.GOMAXPROCS(e.cpuCount)
+	log.Debugf("Engine(%s) stated", e.appName)
 	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
 	return nil
 }
