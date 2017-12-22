@@ -5,10 +5,14 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
 	"github.com/devplayg/golibs/orm"
 	"github.com/devplayg/siem"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"net/http"
+	"strconv"
 )
 
 const (
@@ -16,35 +20,33 @@ const (
 )
 
 var (
-	md5Map    sync.Map
-	statsRank StatsRank
+	ranker statsRank
 )
 
-type StatsMap map[int]map[string]map[interface{}]int64
-type StatsRank map[int]map[string]siem.ItemList
+// Code / Category / Key / Count
+type statsMap map[int]map[string]map[interface{}]int64
 
-type Statist struct {
+// Code / Category / Key / Ranking
+type statsRank map[int]map[string]siem.ItemList
+
+type statsCal struct {
 	engine         *siem.Engine
-	interval       int64
-	statsMap       StatsMap
-	statsRank      StatsRank
+	statsMap       statsMap
+	statsRank      statsRank
 	membersByAsset map[int][]int
-	top            int
 }
 
-func NewStatist(engine *siem.Engine) *Statist {
-	md5Map = sync.Map{}
-
-	return &Statist{
+func NewStatsCal(engine *siem.Engine) *statsCal {
+	return &statsCal{
 		engine: engine,
 	}
 }
 
-func (e *Statist) Start() error {
+func (e *statsCal) Start() error {
 	go func() {
 		for {
-			e.statsMap = make(StatsMap)
-			e.statsRank = make(StatsRank)
+			e.statsMap = make(statsMap)
+			e.statsRank = make(statsRank)
 			if err := e.updateMembersAssets(); err != nil {
 				log.Error(err)
 			}
@@ -54,7 +56,7 @@ func (e *Statist) Start() error {
 
 			rwMutex := new(sync.RWMutex)
 			rwMutex.Lock()
-			statsRank = e.statsRank
+			ranker = e.statsRank
 			rwMutex.Unlock()
 
 			// Sleep
@@ -63,10 +65,12 @@ func (e *Statist) Start() error {
 		}
 	}()
 
+	go e.openHttpApi()
 	return nil
 }
 
-func (e *Statist) generateStats() error {
+
+func (e *statsCal) generateStats() error {
 	t1 := time.Now()
 	query := `
 		select 	t.rdate,
@@ -113,7 +117,7 @@ func (e *Statist) generateStats() error {
 	// Rank
 	for id, m1 := range e.statsMap {
 		for category, _ := range m1 {
-			e.statsRank[id][category] = rankByCount(m1[category], e.top)
+			e.statsRank[id][category] = rankByCount(m1[category], 0)
 		}
 	}
 	t4 := time.Now()
@@ -122,7 +126,7 @@ func (e *Statist) generateStats() error {
 	return nil
 }
 
-func (e *Statist) addToStats(r siem.DownloadLog, category string, val interface{}) error {
+func (e *statsCal) addToStats(r siem.DownloadLog, category string, val interface{}) error {
 
 	// By sensor
 	if r.SensorCode > 0 {
@@ -181,7 +185,7 @@ func (e *Statist) addToStats(r siem.DownloadLog, category string, val interface{
 	return nil
 }
 
-func (e *Statist) updateMembersAssets() error {
+func (e *statsCal) updateMembersAssets() error {
 	query := "select asset_id, member_id from mbr_asset where asset_type = 2"
 	m := make(map[int][]int)
 
@@ -222,11 +226,34 @@ func rankByCount(m map[interface{}]int64, top int) siem.ItemList {
 	}
 }
 
-func GetRank(groupId int, category string, top int) siem.ItemList {
-	if _, ok := statsRank[groupId]; ok {
-		if list, ok2 := statsRank[groupId][category]; ok2 {
-			return list
+func getRank(groupId int, category string, top int) siem.ItemList {
+	if _, ok := ranker[groupId]; ok {
+		if list, ok2 := ranker[groupId][category]; ok2 {
+			if top > 0 && len(list) > top {
+				return list[:top]
+			} else {
+				return list
+			}
 		}
 	}
 	return nil
+}
+
+func rankHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	groupId, _ := strconv.Atoi(vars["groupId"])
+	top, _ := strconv.Atoi(vars["top"])
+
+	list := getRank(groupId, vars["category"], top)
+	buf, _ := json.Marshal(list)
+	w.Write(buf)
+}
+
+func (e *statsCal) openHttpApi() {
+	// Start http server
+	r := mux.NewRouter()
+	r.HandleFunc("/rank/{groupId:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
+	r.PathPrefix("/debug").Handler(http.DefaultServeMux)
+	log.Fatal(http.ListenAndServe(e.engine.Config["server.addr"], r))
 }
