@@ -116,8 +116,8 @@ func (e *statsCal) generateStats() error {
 
 	// Rank
 	for id, m1 := range e.statsMap {
-		for category, _ := range m1 {
-			e.statsRank[id][category] = rankByCount(m1[category], 0)
+		for category, data := range m1 {
+			e.statsRank[id][category] = rankByCount(data, 0)
 		}
 	}
 	t4 := time.Now()
