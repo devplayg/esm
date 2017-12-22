@@ -29,7 +29,7 @@ type statsCal struct {
 	_rank   DataRank
 	rank    DataRank
 
-	membersByAsset map[int][]int
+	memberAssets map[int][]int
 }
 
 func NewStatsCal(engine *siem.Engine, name string, router *mux.Router) *statsCal {
@@ -45,10 +45,10 @@ func (e *statsCal) Start() error {
 		for {
 			e.dataMap = make(DataMap)
 			e._rank = make(DataRank)
-			if err := e.updateMembersAssets(); err != nil {
+			if err := e.updateMemberAssets(); err != nil {
 				log.Error(err)
 			}
-			if err := e.generateStats(); err != nil {
+			if err := e.calculateStats(); err != nil {
 				log.Error(err)
 			}
 
@@ -69,7 +69,7 @@ func (e *statsCal) Start() error {
 	return nil
 }
 
-func (e *statsCal) generateStats() error {
+func (e *statsCal) calculateStats() error {
 	t1 := time.Now()
 	query := `
 		select 	t.rdate,
@@ -116,7 +116,7 @@ func (e *statsCal) generateStats() error {
 	// Rank
 	for id, m1 := range e.dataMap {
 		for category, data := range m1 {
-			e._rank[id][category] = rankByCount(data, 0)
+			e._rank[id][category] = determinRanking(data, 0)
 		}
 	}
 	t4 := time.Now()
@@ -165,7 +165,7 @@ func (e *statsCal) addToStats(r siem.DownloadLog, category string, val interface
 	e.dataMap[ALL][category][val] += 1
 
 	// By member
-	if arr, ok := e.membersByAsset[r.IppoolSrcGcode]; ok {
+	if arr, ok := e.memberAssets[r.IppoolSrcGcode]; ok {
 		for _, memberId := range arr {
 			id := memberId * -1
 
@@ -184,7 +184,7 @@ func (e *statsCal) addToStats(r siem.DownloadLog, category string, val interface
 	return nil
 }
 
-func (e *statsCal) updateMembersAssets() error {
+func (e *statsCal) updateMemberAssets() error {
 	query := "select asset_id, member_id from mbr_asset where asset_type = 2"
 	m := make(map[int][]int)
 
@@ -204,13 +204,13 @@ func (e *statsCal) updateMembersAssets() error {
 
 	rwMutex := new(sync.RWMutex)
 	rwMutex.Lock()
-	e.membersByAsset = m
+	e.memberAssets = m
 	rwMutex.Unlock()
 	return nil
 
 }
 
-func rankByCount(m map[interface{}]int64, top int) siem.ItemList {
+func determinRanking(m map[interface{}]int64, top int) siem.ItemList {
 	list := make(siem.ItemList, len(m))
 	i := 0
 	for k, v := range m {
