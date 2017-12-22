@@ -19,32 +19,32 @@ const (
 	ALL = -1
 )
 
-var (
-	ranker statsRank
-)
-
-type statsMap map[int]map[string]map[interface{}]int64 // Code / Category / Key / Count
-type statsRank map[int]map[string]siem.ItemList // Code / Category / Key / Ranking
+type DataMap map[int]map[string]map[interface{}]int64 // Code / Category / Key / Count
+type DataRank map[int]map[string]siem.ItemList        // Code / Category / Key / Ranking
 type statsCal struct {
-	statsName      string
-	engine         *siem.Engine
-	statsMap       statsMap
-	statsRank      statsRank
+	name    string
+	router  *mux.Router
+	engine  *siem.Engine
+	dataMap DataMap
+	_rank   DataRank
+	rank    DataRank
+
 	membersByAsset map[int][]int
 }
 
-func NewStatsCal(statsName string, engine *siem.Engine) *statsCal {
+func NewStatsCal(engine *siem.Engine, name string, router *mux.Router) *statsCal {
 	return &statsCal{
-		statsName: statsName,
-		engine:    engine,
+		engine: engine,
+		name:   name,
+		router: router,
 	}
 }
 
 func (e *statsCal) Start() error {
 	go func() {
 		for {
-			e.statsMap = make(statsMap)
-			e.statsRank = make(statsRank)
+			e.dataMap = make(DataMap)
+			e._rank = make(DataRank)
 			if err := e.updateMembersAssets(); err != nil {
 				log.Error(err)
 			}
@@ -54,7 +54,7 @@ func (e *statsCal) Start() error {
 
 			rwMutex := new(sync.RWMutex)
 			rwMutex.Lock()
-			ranker = e.statsRank
+			e.rank = e._rank
 			rwMutex.Unlock()
 
 			// Sleep
@@ -63,8 +63,9 @@ func (e *statsCal) Start() error {
 		}
 	}()
 
-	go e.openHttpApi()
-	log.Debugf("Stats(%s) stated", e.statsName)
+	//go e.openHttpApi()
+	e.addHttpApi()
+	log.Debugf("Stats(%s) stated", e.name)
 	return nil
 }
 
@@ -113,9 +114,9 @@ func (e *statsCal) generateStats() error {
 	t3 := time.Now()
 
 	// Rank
-	for id, m1 := range e.statsMap {
+	for id, m1 := range e.dataMap {
 		for category, data := range m1 {
-			e.statsRank[id][category] = rankByCount(data, 0)
+			e._rank[id][category] = rankByCount(data, 0)
 		}
 	}
 	t4 := time.Now()
@@ -128,55 +129,55 @@ func (e *statsCal) addToStats(r siem.DownloadLog, category string, val interface
 
 	// By sensor
 	if r.SensorCode > 0 {
-		if _, ok := e.statsMap[r.SensorCode]; !ok {
-			e.statsMap[r.SensorCode] = make(map[string]map[interface{}]int64)
-			e.statsRank[r.SensorCode] = make(map[string]siem.ItemList)
+		if _, ok := e.dataMap[r.SensorCode]; !ok {
+			e.dataMap[r.SensorCode] = make(map[string]map[interface{}]int64)
+			e._rank[r.SensorCode] = make(map[string]siem.ItemList)
 		}
-		if _, ok := e.statsMap[r.SensorCode][category]; !ok {
-			e.statsMap[r.SensorCode][category] = make(map[interface{}]int64)
-			e.statsRank[r.SensorCode][category] = nil
+		if _, ok := e.dataMap[r.SensorCode][category]; !ok {
+			e.dataMap[r.SensorCode][category] = make(map[interface{}]int64)
+			e._rank[r.SensorCode][category] = nil
 		}
-		e.statsMap[r.SensorCode][category][val] += 1
+		e.dataMap[r.SensorCode][category][val] += 1
 	}
 
 	// By group
 	if r.IppoolSrcGcode > 0 {
-		if _, ok := e.statsMap[r.IppoolSrcGcode]; !ok {
-			e.statsMap[r.IppoolSrcGcode] = make(map[string]map[interface{}]int64)
-			e.statsRank[r.IppoolSrcGcode] = make(map[string]siem.ItemList)
+		if _, ok := e.dataMap[r.IppoolSrcGcode]; !ok {
+			e.dataMap[r.IppoolSrcGcode] = make(map[string]map[interface{}]int64)
+			e._rank[r.IppoolSrcGcode] = make(map[string]siem.ItemList)
 		}
-		if _, ok := e.statsMap[r.IppoolSrcGcode][category]; !ok {
-			e.statsMap[r.IppoolSrcGcode][category] = make(map[interface{}]int64)
-			e.statsRank[r.IppoolSrcGcode][category] = nil
+		if _, ok := e.dataMap[r.IppoolSrcGcode][category]; !ok {
+			e.dataMap[r.IppoolSrcGcode][category] = make(map[interface{}]int64)
+			e._rank[r.IppoolSrcGcode][category] = nil
 		}
-		e.statsMap[r.IppoolSrcGcode][category][val] += 1
+		e.dataMap[r.IppoolSrcGcode][category][val] += 1
 	}
 
 	// To all
-	if _, ok := e.statsMap[ALL]; !ok {
-		e.statsMap[ALL] = make(map[string]map[interface{}]int64)
-		e.statsRank[ALL] = make(map[string]siem.ItemList)
+	if _, ok := e.dataMap[ALL]; !ok {
+		e.dataMap[ALL] = make(map[string]map[interface{}]int64)
+		e._rank[ALL] = make(map[string]siem.ItemList)
 	}
-	if _, ok := e.statsMap[ALL][category]; !ok {
-		e.statsMap[ALL][category] = make(map[interface{}]int64)
-		e.statsRank[ALL][category] = nil
+	if _, ok := e.dataMap[ALL][category]; !ok {
+		e.dataMap[ALL][category] = make(map[interface{}]int64)
+		e._rank[ALL][category] = nil
 	}
-	e.statsMap[ALL][category][val] += 1
+	e.dataMap[ALL][category][val] += 1
 
 	// By member
 	if arr, ok := e.membersByAsset[r.IppoolSrcGcode]; ok {
 		for _, memberId := range arr {
 			id := memberId * -1
 
-			if _, ok := e.statsMap[id]; !ok {
-				e.statsMap[id] = make(map[string]map[interface{}]int64)
-				e.statsRank[id] = make(map[string]siem.ItemList)
+			if _, ok := e.dataMap[id]; !ok {
+				e.dataMap[id] = make(map[string]map[interface{}]int64)
+				e._rank[id] = make(map[string]siem.ItemList)
 			}
-			if _, ok := e.statsMap[id][category]; !ok {
-				e.statsMap[id][category] = make(map[interface{}]int64)
-				e.statsRank[id][category] = nil
+			if _, ok := e.dataMap[id][category]; !ok {
+				e.dataMap[id][category] = make(map[interface{}]int64)
+				e._rank[id][category] = nil
 			}
-			e.statsMap[id][category][val] += 1
+			e.dataMap[id][category][val] += 1
 		}
 	}
 
@@ -224,9 +225,9 @@ func rankByCount(m map[interface{}]int64, top int) siem.ItemList {
 	}
 }
 
-func getRank(groupId int, category string, top int) siem.ItemList {
-	if _, ok := ranker[groupId]; ok {
-		if list, ok2 := ranker[groupId][category]; ok2 {
+func (e *statsCal) getRank(groupId int, category string, top int) siem.ItemList {
+	if _, ok := e.rank[groupId]; ok {
+		if list, ok2 := e.rank[groupId][category]; ok2 {
 			if top > 0 && len(list) > top {
 				return list[:top]
 			} else {
@@ -237,21 +238,17 @@ func getRank(groupId int, category string, top int) siem.ItemList {
 	return nil
 }
 
-func rankHandler(w http.ResponseWriter, r *http.Request) {
+func (e *statsCal) rankHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	groupId, _ := strconv.Atoi(vars["groupId"])
 	top, _ := strconv.Atoi(vars["top"])
 
-	list := getRank(groupId, vars["category"], top)
+	list := e.getRank(groupId, vars["category"], top)
 	buf, _ := json.Marshal(list)
 	w.Write(buf)
 }
 
-func (e *statsCal) openHttpApi() {
-	// Start http server
-	r := mux.NewRouter()
-	r.HandleFunc("/rank/{groupId:-?[0-9]+}/{category}/{top:[0-9]+}", rankHandler)
-	r.PathPrefix("/debug").Handler(http.DefaultServeMux)
-	log.Fatal(http.ListenAndServe(e.engine.Config["server.addr"], r))
+func (e *statsCal) addHttpApi() {
+	e.router.HandleFunc("/rank/{groupId:-?[0-9]+}/{category}/{top:[0-9]+}", e.rankHandler)
 }

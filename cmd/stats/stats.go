@@ -5,13 +5,14 @@ import (
 	"github.com/devplayg/siem/stats"
 	log "github.com/sirupsen/logrus"
 	_ "net/http/pprof"
+	"net/http"
 	"os"
+	"github.com/gorilla/mux"
 )
 
 const (
 	AppName           = "stats"
 	AppVersion        = "2.0.2"
-	DefaultServerAddr = "127.0.0.1:8080"
 )
 
 func main() {
@@ -46,14 +47,20 @@ func main() {
 	log.Debug(engine.Config)
 
 	// Start application
-	app := stats.NewStatsCal("nsFiletrans", engine)
+	router := mux.NewRouter()
+	app := stats.NewStatsCal(engine, "nsFiletrans", router)
 	app.Start()
-
+	router.PathPrefix("/debug").Handler(http.DefaultServeMux)
+	log.Fatal(http.ListenAndServe(engine.Config["server.addr"], router))
+	//
 
 	/*
 
 	nsFileTransStats := stats.NewNsFileTransStatsCal(engine)
 	nsFileTransStats.Start()
+
+	agentStats := stats.AgentStatsCal(engine)
+	agentStats.Start()
 
 
 	 */
