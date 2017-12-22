@@ -2,17 +2,18 @@ package main
 
 import (
 	"github.com/devplayg/siem"
-	"github.com/devplayg/siem/stats"
-	log "github.com/sirupsen/logrus"
-	_ "net/http/pprof"
-	"net/http"
-	"os"
+	//"github.com/devplayg/siem/stats"
+	"github.com/devplayg/siem_master/stats"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
 )
 
 const (
-	AppName           = "stats"
-	AppVersion        = "2.0.2"
+	AppName    = "stats"
+	AppVersion = "2.0.2"
 )
 
 func main() {
@@ -48,24 +49,32 @@ func main() {
 
 	// Start application
 	router := mux.NewRouter()
-	app := stats.NewStatsCal(engine, "nsFiletrans", router)
-	app.Start()
 	router.PathPrefix("/debug").Handler(http.DefaultServeMux)
-	log.Fatal(http.ListenAndServe(engine.Config["server.addr"], router))
+
+	//startStats(stats.StatsCalculator())
+
+	//NewE
+	//app := stats.NewStatsCal(engine, "nsFiletrans", router)
+	//app.Start()
+	go http.ListenAndServe(engine.Config["server.addr"], router)
 	//
 
 	/*
 
-	nsFileTransStats := stats.NewNsFileTransStatsCal(engine)
-	nsFileTransStats.Start()
+		nsFileTransStats := stats.NewNsFileTransStatsCal(engine)
+		nsFileTransStats.Start()
 
-	agentStats := stats.AgentStatsCal(engine)
-	agentStats.Start()
-
-
-	 */
+		agentStats := stats.AgentStatsCal(engine)
+		agentStats.Start()
 
 
+	*/
+
+	log.Debug("Waiting for signal..")
 	// Wait for signal
 	siem.WaitForSignals()
+}
+
+func StartStatsCalculator(s stats.StatsCalculator) {
+	s.Start()
 }

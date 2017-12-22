@@ -45,7 +45,10 @@ type Md5Hash struct {
 	Udate    time.Time
 }
 
+type Event struct{}
+
 type DownloadLog struct {
+	Event
 	Rdate          time.Time
 	SensorCode     int
 	IppoolSrcGcode int
