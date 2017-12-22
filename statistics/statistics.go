@@ -23,26 +23,26 @@ type StatsCalculator interface {
 	//getRanking(groupId int, category string, top int) siem.ItemList
 }
 
-type stats struct {
-	engine       *siem.Engine
-	name         string
-	router       *mux.Router
-	dataMap      DataMap
-	_rank        DataRank
-	rank         DataRank
-	memberAssets map[int][]int
+type Stats struct {
+	Name         string
+	Engine       *siem.Engine
+	Router       *mux.Router
+	//dataMap      DataMap
+	//_rank        DataRank
+	//rank         DataRank
+	//memberAssets map[int][]int
 }
 
-func NewStats(engine *siem.Engine, name string, router *mux.Router) *statsCal {
-	return &stats{
-		engine: engine,
-		name:   name,
-		router: router,
+func NewStats(engine *siem.Engine, name string, router *mux.Router) *Stats {
+	return &Stats{
+		Engine: engine,
+		Name:   name,
+		Router: router,
 	}
 }
 
 
-func (e *statsCal) Start() error {
+func (e *Stats) Start() error {
 //	go func() {
 //		for {
 //			e.dataMap = make(DataMap)
@@ -67,7 +67,7 @@ func (e *statsCal) Start() error {
 //
 //	//go e.openHttpApi()
 //	e.addHttpApi()
-	log.Debugf("Stats(%s) stated", e.name)
+	log.Debugf("Stats(%s) stated", e.Name)
 	return nil
 }
 //

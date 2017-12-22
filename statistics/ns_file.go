@@ -1,66 +1,59 @@
 package statistics
 
-import "github.com/gorilla/mux"
+import (
+	"github.com/devplayg/siem"
+	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
+)
 
-type nsFile struct {
-	name         string
-	router       *mux.Router
-	engine       *siem.Engine
+type nsFileStats struct {
+	Stats
 	dataMap      DataMap
 	_rank        DataRank
 	rank         DataRank
 	memberAssets map[int][]int
 }
 
-//import (
-//	"github.com/devplayg/siem"
-//	"sort"
-//	"net/http"
-//	"github.com/gorilla/mux"
-//	"strconv"
-//	"encoding/json"
-//	log "github.com/sirupsen/logrus"
-//	"sync"
-//	"time"
-//	"github.com/devplayg/golibs/orm"
-//)
+func NewNsFileStats(engine *siem.Engine, router *mux.Router) *nsFileStats {
+	return &nsFileStats{
+		Stats: Stats{
+			Name:   "ns_file",
+			Engine: engine,
+			Router: router,
+		},
+	}
+}
+func (s *nsFileStats) Start() error {
+	//go func() {
+	//for {
+	//	e.dat
 
-//func NewStatsCal(engine *siem.Engine, name string, router *mux.Router) *statsCal {
-//	return &statsCal{
-//		engine: engine,
-//		name:   name,
-//		router: router,
-//	}
-//}
-//
-//func (e *statsCal) Start() error {
-//	go func() {
-//		for {
-//			e.dataMap = make(DataMap)
-//			e._rank = make(DataRank)
-//			if err := e.updateMemberAssets(); err != nil {
-//				log.Error(err)
-//			}
-//			if err := e.calculateStats(); err != nil {
-//				log.Error(err)
-//			}
-//
-//			rwMutex := new(sync.RWMutex)
-//			rwMutex.Lock()
-//			e.rank = e._rank
-//			rwMutex.Unlock()
-//
-//			// Sleep
-//			log.Debugf("Sleep %3.1fs", (time.Duration(e.engine.Interval) * time.Millisecond).Seconds())
-//			time.Sleep(time.Duration(e.engine.Interval) * time.Millisecond)
-//		}
-//	}()
-//
-//	//go e.openHttpApi()
-//	e.addHttpApi()
-//	log.Debugf("Stats(%s) stated", e.name)
-//	return nil
-//}
+	//			e.dataMap = make(DataMap)
+	//			e._rank = make(DataRank)
+	//			if err := e.updateMemberAssets(); err != nil {
+	//				log.Error(err)
+	//			}
+	//			if err := e.calculateStats(); err != nil {
+	//				log.Error(err)
+	//			}
+	//
+	//			rwMutex := new(sync.RWMutex)
+	//			rwMutex.Lock()
+	//			e.rank = e._rank
+	//			rwMutex.Unlock()
+	//
+	//			// Sleep
+	//			log.Debugf("Sleep %3.1fs", (time.Duration(e.engine.Interval) * time.Millisecond).Seconds())
+	//			time.Sleep(time.Duration(e.engine.Interval) * time.Millisecond)
+	//}
+	//}()
+	//
+	//	//go e.openHttpApi()
+	//	e.addHttpApi()
+	log.Debugf("Stats(%s) stated", s.Name)
+	return nil
+}
+
 //
 //func (e *statsCal) calculateStats() error {
 //	t1 := time.Now()

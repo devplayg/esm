@@ -2,13 +2,12 @@ package main
 
 import (
 	"github.com/devplayg/siem"
-	//"github.com/devplayg/siem/stats"
-	"github.com/devplayg/siem_master/stats"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"github.com/devplayg/siem/statistics"
 )
 
 const (
@@ -51,7 +50,11 @@ func main() {
 	router := mux.NewRouter()
 	router.PathPrefix("/debug").Handler(http.DefaultServeMux)
 
-	//startStats(stats.StatsCalculator())
+	//statistics.NewNsFileStats(engine, router)
+
+	startCalculatingStats(statistics.NewNsFileStats(engine, router))
+
+
 
 	//NewE
 	//app := stats.NewStatsCal(engine, "nsFiletrans", router)
@@ -75,6 +78,8 @@ func main() {
 	siem.WaitForSignals()
 }
 
-func StartStatsCalculator(s stats.StatsCalculator) {
-	s.Start()
+func startCalculatingStats(s statistics.StatsCalculator) {
+	if err := s.Start(); err != nil {
+		log.Error(err)
+	}
 }
