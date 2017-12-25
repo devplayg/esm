@@ -44,42 +44,27 @@ func main() {
 		log.Error(err)
 		return
 	}
-	log.Debug(engine.Config)
+	log.Debug("engine started")
 
-	// Start application
+	// Start URL router and application
 	router := mux.NewRouter()
 	router.PathPrefix("/debug").Handler(http.DefaultServeMux)
-
-	//statistics.NewNsFileStats(engine, router)
-
-	startCalculatingStats(statistics.NewNsFileStats(engine, router))
-
-
-
-	//NewE
-	//app := stats.NewStatsCal(engine, "nsFiletrans", router)
-	//app.Start()
+	if err := startCalculatingStats(statistics.NewNsFileStats(engine, router)); err != nil {
+		log.Error(err)
+		return
+	}
 	go http.ListenAndServe(engine.Config["server.addr"], router)
-	//
+	log.Debugf("HTTP server started. Listen: %s", engine.Config["server.addr"])
 
-	/*
-
-		nsFileTransStats := stats.NewNsFileTransStatsCal(engine)
-		nsFileTransStats.Start()
-
-		agentStats := stats.AgentStatsCal(engine)
-		agentStats.Start()
-
-
-	*/
-
-	log.Debug("Waiting for signal..")
 	// Wait for signal
+	log.Debug("Waiting for signal..")
 	siem.WaitForSignals()
 }
 
-func startCalculatingStats(s statistics.StatsCalculator) {
+func startCalculatingStats(s statistics.StatsCalculator) error {
 	if err := s.Start(); err != nil {
-		log.Error(err)
+		return err
 	}
+	log.Infof("Statistics(%s) started", s.GetName())
+	return nil
 }

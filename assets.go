@@ -31,6 +31,26 @@ func GetSensors() ([]Sensor, error) {
 	return sensors, err
 }
 
+func GetMemberAssets() (map[int][]int, error) {
+	query := "select asset_id, member_id from mbr_asset where asset_type = 2"
+	assets := make(map[int][]int)
+
+	//	m := make(map[int]map[int]bool)
+	o := orm.NewOrm()
+	var rows []MemberAsset
+	_, err := o.Raw(query).QueryRows(&rows)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		if _, ok := assets[r.AssetId]; !ok {
+			assets[r.AssetId] = make([]int, 0)
+		}
+		assets[r.AssetId] = append(assets[r.AssetId], r.MemberId)
+	}
+	return assets, nil
+}
+
 type Md5Hash struct {
 	Md5      string
 	Score    int

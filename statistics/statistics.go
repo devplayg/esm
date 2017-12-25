@@ -15,6 +15,7 @@ type DataMap map[int]map[string]map[interface{}]int64 // Code / Category / Key /
 type DataRank map[int]map[string]siem.ItemList        // Code / Category / Key / Ranking
 type StatsCalculator interface {
 	Start() error
+	GetName() string
 	//calculate() error
 	//addToStats(r siem.Event, category string, val interface{}) error
 	//determineRanking(A map[interface{}]int64, top int) siem.ItemList

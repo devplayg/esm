@@ -2,20 +2,20 @@ package siem
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/devplayg/golibs/crypto"
+	"github.com/devplayg/golibs/orm"
 	_ "github.com/go-sql-driver/mysql"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
-	"github.com/devplayg/golibs/crypto"
-	"github.com/devplayg/golibs/orm"
-	log "github.com/sirupsen/logrus"
-	"runtime"
-	"crypto/sha256"
 )
 
 var (
@@ -33,7 +33,7 @@ type Engine struct {
 	ConfigPath  string
 	Config      map[string]string
 	Interval    int64
-	appName string
+	appName     string
 	debug       bool
 	cpuCount    int
 	processName string
@@ -42,7 +42,7 @@ type Engine struct {
 
 func NewEngine(appName string, debug bool, cpuCount int, interval int64) *Engine {
 	e := Engine{
-		appName: appName,
+		appName:     appName,
 		processName: strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0])),
 		cpuCount:    cpuCount,
 		debug:       debug,
@@ -54,23 +54,22 @@ func NewEngine(appName string, debug bool, cpuCount int, interval int64) *Engine
 }
 
 func (e *Engine) Start() error {
-	config, err := e.getConfig()
+	var err error
+
+	e.Config, err = e.getConfig()
 	if err != nil {
-		fmt.Println(err.Error())
 		return err
 	}
-	if _, ok := config["db.hostname"]; !ok {
+	if _, ok := e.Config["db.hostname"]; !ok {
 		return errors.New("invalid configurations")
 	}
-	e.Config = config
+	log.Debug(e.Config)
 
 	err = e.initDatabase()
 	if err != nil {
 		return err
 	}
-
 	runtime.GOMAXPROCS(e.cpuCount)
-	log.Debugf("Engine(%s) stated", e.appName)
 	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
 	return nil
 }
@@ -83,24 +82,24 @@ func (e *Engine) initLogger() error {
 		DisableColors: true,
 	})
 
-	// Set log file
-	logFile := filepath.Join(filepath.Dir(os.Args[0]), e.processName+".log")
+	// Set log level
+	var logFile string
+	if e.debug {
+		logFile = filepath.Join(filepath.Dir(os.Args[0]), e.processName+"-debug.log")
+		log.SetLevel(log.DebugLevel)
+		os.Remove(logFile)
+	} else {
+		logFile = filepath.Join(filepath.Dir(os.Args[0]), e.processName+".log")
+		log.SetLevel(log.InfoLevel)
+	}
+
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err == nil {
 		log.SetOutput(file)
 		e.logOutput = 1
-		//fmt.Printf("Output: %s\n", file.Name())
 	} else {
-		//		log.Error("Failed to log to file, using default stderr")
 		e.logOutput = 0
 		log.SetOutput(os.Stdout)
-	}
-
-	// Set log level
-	if e.debug {
-		log.SetLevel(log.DebugLevel)
-	} else {
-		log.SetLevel(log.InfoLevel)
 	}
 
 	if log.GetLevel() != log.InfoLevel {
@@ -196,4 +195,3 @@ func PrintHelp() {
 func DisplayVersion(prodName, version string) {
 	fmt.Printf("%s, v%s\n", prodName, version)
 }
-
