@@ -7,7 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/devplayg/golibs/crypto"
-	"github.com/devplayg/golibs/orm"
+	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -69,6 +69,7 @@ func (e *Engine) Start() error {
 	if err != nil {
 		return err
 	}
+
 	runtime.GOMAXPROCS(e.cpuCount)
 	log.Debugf("GOMAXPROCS set to %d", runtime.GOMAXPROCS(0))
 	return nil
@@ -110,7 +111,6 @@ func (e *Engine) initLogger() error {
 }
 
 func (e *Engine) initDatabase() error {
-
 	connStr := fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?allowAllFiles=true&charset=utf8&parseTime=true&loc=%s",
 		e.Config["db.username"],

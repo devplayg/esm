@@ -3,7 +3,7 @@ package siem
 import (
 	"time"
 
-	"github.com/devplayg/golibs/orm"
+	"github.com/astaxie/beego/orm"
 )
 
 type DbInfo struct {
@@ -85,6 +85,7 @@ type DownloadLog struct {
 	MailSender     string
 	MailRecipient  string
 	Filename       string
+	Score          int
 
 	//	Rdate      time.Time
 	//	Every10Min string

@@ -21,7 +21,7 @@ func main() {
 		debug     = siem.CmdFlags.Bool("debug", false, "Debug")
 		cpu       = siem.CmdFlags.Int("cpu", 2, "CPU Count")
 		setConfig = siem.CmdFlags.Bool("config", false, "Edit configurations")
-		interval  = siem.CmdFlags.Int64("i", 5000, "Interval(ms)")
+		interval  = siem.CmdFlags.Int64("i", 15000, "Interval(ms)")
 	)
 	siem.CmdFlags.Usage = siem.PrintHelp
 	siem.CmdFlags.Parse(os.Args[1:])
