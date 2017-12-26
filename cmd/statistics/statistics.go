@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	AppName    = "stats"
-	AppVersion = "2.0.2"
+	AppName    = "statistics"
+	AppVersion = "2.0.3"
 )
 
 func main() {

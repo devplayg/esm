@@ -2,20 +2,17 @@ package statistics
 
 import (
 	"encoding/json"
-	//"fmt"
+	"fmt"
 	"github.com/astaxie/beego/orm"
 	"github.com/devplayg/siem"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
-	//"io/ioutil"
-	//"os"
-	"io/ioutil"
-	"os"
-	"fmt"
 )
 
 type nsFileStats struct {
@@ -55,10 +52,9 @@ func (s *nsFileStats) Start() error {
 				s.mutex.Unlock()
 			}
 
-			s.t = time.Now()
-			//log.Debugf("##1 %s", s.t.Format("2006-01-02T15:04:05"))
 			s.dataMap = make(DataMap)
 			s._rank = make(DataRank)
+			s.t = time.Now()
 			err = s.calculate()
 			if err != nil {
 				log.Error(err)
@@ -120,25 +116,28 @@ func (s *nsFileStats) calculate() error {
 		s.addToStats(&r, "dstip", r.DstIp, false)
 		s.addToStats(&r, "md5", r.Md5, false)
 	}
-	t2 := time.Now()
 
 	// Determine rankings
+	t2 := time.Now()
 	for id, m := range s.dataMap {
 		for category, data := range m {
 			s._rank[id][category] = determineRankings(data, 5)
-			//err := s.insert(category, id, s._rank[id][category])
-			//if err != nil {
-			//	return err
-			//}
 		}
 	}
-	t3 := time.Now()
 
+	// Insert data into DB
+	t3 := time.Now()
 	err = s.insert()
 	if err != nil {
 		return err
 	}
-	log.Infof("Query=%3.1f, RowCount=%d, Classify=%3.1f, Insert=%3.1f", t1.Sub(s.t).Seconds(), len(rows), t2.Sub(t1).Seconds(), t3.Sub(t2).Seconds())
+	log.Infof("Query=%3.1f, RowCount=%d, Classify=%3.1f, Rank=%3.1f, Insert=%3.1f",
+		t1.Sub(s.t).Seconds(),
+		len(rows),
+		t2.Sub(t1).Seconds(),
+		t3.Sub(t2).Seconds(),
+		time.Now().Sub(t3).Seconds(),
+	)
 
 	return nil
 }
@@ -181,49 +180,6 @@ func (s *nsFileStats) insert() error {
 			return err
 		}
 	}
-
-	// Bulk insert
-	//tempFile, err := ioutil.TempFile("", "")
-	//if err != nil {
-	//	return err
-	//}
-	//defer func() {
-	//	tempFile.Close()
-	//	os.Remove(tempFile.Name())
-	//}()
-	//
-	//for i, item := range list {
-	//	str := fmt.Sprintf("%s\t%d\t%v\t%d\t%d\n", s.t.Format("2006-01-02 15:04:05"), id, item.Key, item.Count, i+1)
-	//	tempFile.WriteString(str)
-	//}
-	//tempFile.Close()
-	//res, err := s.o.Raw(fmt.Sprintf("LOAD DATA LOCAL INFILE %q INTO TABLE stat_%s", tempFile.Name(), category)).Exec()
-	//if err == nil {
-	//	num, _ := res.RowsAffected()
-	//	log.Debugf("Category: %s, Affected rows: %d ", category, num)
-	//} else {
-	//	return err
-	//}
-	//return nil
-
-	//// Insert (Prepared statement)
-	//err := o.Begin()
-	//key := strings.TrimSuffix(category, "_mal")
-	//query := fmt.Sprintf("INSERT INTO stat_%s(rdate, folder_id, %s, count, rank) values(?, ?, ?, ?, ?)", category, key)
-	//p, err := s.o.Raw(query).Prepare()
-	//if err != nil {
-	//	return err
-	//}
-	//for i, item := range s._rank[id][category] {
-	//	//log.Infof("       %d - %s - [%d] %v - %d", id, category, i+1, item.Key, item.Count)
-	//	_, err = p.Exec(s.t.Format("2006-01-02 15:04:05"), id, item.Key, item.Count, i+1)
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//}
-	//p.Close()
-	//o.Commit()
 
 	return nil
 }
@@ -333,28 +289,3 @@ func (s *nsFileStats) addRoute() {
 func (s *nsFileStats) GetName() string {
 	return s.name
 }
-
-//
-//func (s *nsFileStats) insert() error {
-//	log.Debug("##3")
-//	for id, m1 := range s.rank {
-//		//log.Debugf("    id - %d", id)
-//		for category, list := range m1 {
-//			//log.Debugf("    %d - %s", id, category)
-//			query := fmt.Sprintf("INSERT INTO stat_%s(rdate, folder_id, %s, count, rank) values(?, ?, ?, ?, ?)", category, category)
-//			p, err := s.o.Raw(query).Prepare()
-//			if err != nil {
-//				log.Error(err)
-//				return err
-//			}
-//			//
-//			for i, item := range list {
-//				log.Printf("       %d - %s - [%d] %v - %d", id, category, i+1, item.Key, item.Count)
-//				//		p.Exec(s.t.Format("2006-01-02 15:04:05"), id, item.Key, item.Count, i+1)
-//			}
-//			p.Close()
-//		}
-//	}
-//
-//	return nil
-//}
