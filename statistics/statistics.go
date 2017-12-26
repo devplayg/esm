@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	ROOT_ID = -1
+	RootId = -1
+	DateDefault = "2006-01-02 15:04:05"
 )
 
 type DataMap map[int]map[string]map[interface{}]int64 // Code / Category / Key / Count

@@ -131,6 +131,7 @@ func (s *nsFileStats) calculate() error {
 	if err != nil {
 		return err
 	}
+	s.update()
 	log.Infof("Query=%3.1f, RowCount=%d, Classify=%3.1f, Rank=%3.1f, Insert=%3.1f",
 		t1.Sub(s.t).Seconds(),
 		len(rows),
@@ -140,6 +141,15 @@ func (s *nsFileStats) calculate() error {
 	)
 
 	return nil
+}
+
+func (s *nsFileStats) update() error {
+	query := "update sys_config set value = ? where section = ? and keyword = ?"
+	_, err := s.o.Raw(query, s.t.Format(DateDefault), "stats", "last_update").Exec()
+
+	// Delete stats : 00:00:00 <= x < now
+	// Generating past statistics
+	return err
 }
 
 func (s *nsFileStats) insert() error {
@@ -161,7 +171,7 @@ func (s *nsFileStats) insert() error {
 			}
 
 			for i, item := range list {
-				str := fmt.Sprintf("%s\t%d\t%v\t%d\t%d\n", s.t.Format("2006-01-02 15:04:05"), id, item.Key, item.Count, i+1)
+				str := fmt.Sprintf("%s\t%d\t%v\t%d\t%d\n", s.t.Format(DateDefault), id, item.Key, item.Count, i+1)
 				fm[category].WriteString(str)
 			}
 		}
@@ -211,15 +221,15 @@ func (s *nsFileStats) addToStats(r *siem.DownloadLog, category string, val inter
 	}
 
 	// To all
-	if _, ok := s.dataMap[ROOT_ID]; !ok {
-		s.dataMap[ROOT_ID] = make(map[string]map[interface{}]int64)
-		s._rank[ROOT_ID] = make(map[string]siem.ItemList)
+	if _, ok := s.dataMap[RootId]; !ok {
+		s.dataMap[RootId] = make(map[string]map[interface{}]int64)
+		s._rank[RootId] = make(map[string]siem.ItemList)
 	}
-	if _, ok := s.dataMap[ROOT_ID][category]; !ok {
-		s.dataMap[ROOT_ID][category] = make(map[interface{}]int64)
-		s._rank[ROOT_ID][category] = nil
+	if _, ok := s.dataMap[RootId][category]; !ok {
+		s.dataMap[RootId][category] = make(map[interface{}]int64)
+		s._rank[RootId][category] = nil
 	}
-	s.dataMap[ROOT_ID][category][val] += 1
+	s.dataMap[RootId][category][val] += 1
 
 	// By member
 	if arr, ok := s.memberAssets[r.IppoolSrcGcode]; ok {
