@@ -55,7 +55,7 @@ func (s *nsFileStats) Start() error {
 			s.dataMap = make(DataMap)
 			s._rank = make(DataRank)
 			s.t = time.Now()
-			err = s.calculate()
+			err = s.produce() // date from ~ to
 			if err != nil {
 				log.Error(err)
 			} else {
@@ -63,6 +63,9 @@ func (s *nsFileStats) Start() error {
 				s.rank = s._rank
 				s.mutex.Unlock()
 			}
+
+			s.update() // Record last updated
+			s.clean() // Remove statistics(from ~ to)
 
 			// Sleep
 			log.Debugf("Sleep %3.1fs", (time.Duration(s.Stats.Engine.Interval) * time.Millisecond).Seconds())
@@ -74,7 +77,7 @@ func (s *nsFileStats) Start() error {
 	return nil
 }
 
-func (s *nsFileStats) calculate() error {
+func (s *nsFileStats) produce() error {
 	query := `
 		select 	t.rdate,
 				(sensor_code + 100000) sensor_code,
@@ -101,7 +104,6 @@ func (s *nsFileStats) calculate() error {
 	`
 	startDate := s.t.Format("2006-01-02") + " 00:00:00"
 	endDate := s.t.Format("2006-01-02") + " 23:59:59"
-
 	var rows []siem.DownloadLog
 	o := orm.NewOrm()
 	_, err := o.Raw(query, startDate, endDate).QueryRows(&rows)
@@ -125,13 +127,12 @@ func (s *nsFileStats) calculate() error {
 		}
 	}
 
-	// Insert data into DB
+	// Insert statistics into DB tables
 	t3 := time.Now()
 	err = s.insert()
 	if err != nil {
 		return err
 	}
-	s.update()
 	log.Infof("Query=%3.1f, RowCount=%d, Classify=%3.1f, Rank=%3.1f, Insert=%3.1f",
 		t1.Sub(s.t).Seconds(),
 		len(rows),
@@ -150,6 +151,15 @@ func (s *nsFileStats) update() error {
 	// Delete stats : 00:00:00 <= x < now
 	// Generating past statistics
 	return err
+}
+
+func (s *nsFileStats) clean() error {
+	//query := "update sys_config set value = ? where section = ? and keyword = ?"
+	//_, err := s.o.Raw(query, s.t.Format(DateDefault), "stats", "last_update").Exec()
+	//
+	// Delete stats : 00:00:00 <= x < now
+	// Generating past statistics
+	return nil
 }
 
 func (s *nsFileStats) insert() error {
