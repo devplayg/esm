@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	ALL = -1
+	ROOT_ID = -1
 )
 
 type DataMap map[int]map[string]map[interface{}]int64 // Code / Category / Key / Count

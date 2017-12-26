@@ -146,7 +146,6 @@ func (s *nsFileStats) insert() error {
 	fm := make(map[string]*os.File)
 	defer func() {
 		for _, f := range fm {
-			//log.Debug(f.Name())
 			f.Close()
 			os.Remove(f.Name())
 		}
@@ -174,7 +173,6 @@ func (s *nsFileStats) insert() error {
 		res, err := s.o.Raw(query).Exec()
 		if err == nil {
 			num, _ := res.RowsAffected()
-			//log.Debugf("query=%s", query)
 			log.Debugf("affectedRows=%d, category=%s", num, category)
 		} else {
 			return err
@@ -213,15 +211,15 @@ func (s *nsFileStats) addToStats(r *siem.DownloadLog, category string, val inter
 	}
 
 	// To all
-	if _, ok := s.dataMap[ALL]; !ok {
-		s.dataMap[ALL] = make(map[string]map[interface{}]int64)
-		s._rank[ALL] = make(map[string]siem.ItemList)
+	if _, ok := s.dataMap[ROOT_ID]; !ok {
+		s.dataMap[ROOT_ID] = make(map[string]map[interface{}]int64)
+		s._rank[ROOT_ID] = make(map[string]siem.ItemList)
 	}
-	if _, ok := s.dataMap[ALL][category]; !ok {
-		s.dataMap[ALL][category] = make(map[interface{}]int64)
-		s._rank[ALL][category] = nil
+	if _, ok := s.dataMap[ROOT_ID][category]; !ok {
+		s.dataMap[ROOT_ID][category] = make(map[interface{}]int64)
+		s._rank[ROOT_ID][category] = nil
 	}
-	s.dataMap[ALL][category][val] += 1
+	s.dataMap[ROOT_ID][category][val] += 1
 
 	// By member
 	if arr, ok := s.memberAssets[r.IppoolSrcGcode]; ok {
@@ -249,8 +247,8 @@ func (s *nsFileStats) addToStats(r *siem.DownloadLog, category string, val inter
 
 func (s *nsFileStats) getRank(groupId int, category string, top int) siem.ItemList {
 	s.mutex.RLock()
-
 	defer s.mutex.RUnlock()
+
 	if _, ok := s.rank[groupId]; ok {
 		if list, ok2 := s.rank[groupId][category]; ok2 {
 			if top > 0 && len(list) > top {
@@ -276,8 +274,9 @@ func (s *nsFileStats) rankHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *nsFileStats) rankAll(w http.ResponseWriter, r *http.Request) {
 	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
 	buf, _ := json.Marshal(s.rank)
-	s.mutex.RUnlock()
 	w.Write(buf)
 }
 
