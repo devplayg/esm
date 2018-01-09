@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// Set configurations
-	engine := siem.NewEngine(*debug, *cpu, *interval)
+	engine := siem.NewEngine(AppName, *debug, *cpu, *interval)
 	if *setConfig {
 		engine.SetConfig("storage.watchDir")
 		return
